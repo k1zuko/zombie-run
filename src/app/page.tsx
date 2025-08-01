@@ -29,7 +29,7 @@ export default function HomePage() {
         .insert({
           room_code: roomCode,
           title: "Robot Run Game",
-          
+
         })
         .select()
         .single()
@@ -40,7 +40,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error creating game:", error)
     } finally {
-      setIsCreating(false)  
+      setIsCreating(false)
     }
   }
 
@@ -110,6 +110,13 @@ export default function HomePage() {
               <h1 className="text-6xl md:text-8xl font-black bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
                 Zombie Run
               </h1>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                className="mr-4"
+              >
+                <Gamepad2 className="w-16 h-16 text-white" />
+              </motion.div>
             </div>
             <motion.p
               initial={{ opacity: 0 }}
@@ -125,62 +132,11 @@ export default function HomePage() {
               transition={{ delay: 0.8, duration: 0.5 }}
               className="flex items-center justify-center gap-2 mt-4"
             >
-              <Sparkles className="w-5 h-5 text-yellow-400" />
-              <span className="text-gray-300">.</span>
-              <Sparkles className="w-5 h-5 text-yellow-400" />
             </motion.div>
           </motion.div>
 
           {/* Main Cards */}
           <div className="grid lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Host Game Card */}
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.8 }}
-              whileHover={{ scale: 1.02 }}
-              className="group"
-            >
-              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 h-full">
-                <CardHeader className="text-center pb-6">
-                  <motion.div
-                    className="w-20 h-20 bg-gradient-to-br from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:shadow-2xl group-hover:shadow-white/20 transition-all duration-300"
-                    whileHover={{ rotate: 5 }}
-                  >
-                    <Users className="w-10 h-10 text-black" />
-                  </motion.div>
-                  <CardTitle className="text-3xl font-bold text-white mb-2">Host Game</CardTitle>
-                  <CardDescription className="text-gray-400 text-lg">
-                    Buat room baru dan undang teman-teman untuk bermain bersama
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <Button
-                    onClick={handleHostGame}
-                    disabled={isCreating}
-                    className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50"
-                  >
-                    {isCreating ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                        className="w-5 h-5 mr-2"
-                      >
-                        <Zap className="w-5 h-5" />
-                      </motion.div>
-                    ) : (
-                      <Play className="w-5 h-5 mr-2" />
-                    )}
-                    {isCreating ? "Membuat Game..." : "Buat Game Baru"}
-                  </Button>
-                  <div className="mt-4 text-center">
-                    <p className="text-gray-500 text-sm">• Kontrol penuh atas permainan</p>
-                    <p className="text-gray-500 text-sm">• Lihat progress semua pemain</p>
-                    <p className="text-gray-500 text-sm">• Atur durasi dan tingkat kesulitan</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
 
             {/* Join Game Card */}
             <motion.div
@@ -242,14 +198,52 @@ export default function HomePage() {
                     )}
                     {isJoining ? "Bergabung..." : "Bergabung ke Game"}
                   </Button>
-                  <div className="text-center">
-                    <p className="text-gray-500 text-sm">• Bermain dengan hingga 40 pemain</p>
-                    <p className="text-gray-500 text-sm">• Kolaborasi untuk menyelesaikan misi</p>
-                    <p className="text-gray-500 text-sm">• Kompetisi seru dengan mini-games</p>
-                  </div>
                 </CardContent>
               </Card>
             </motion.div>
+          {/* Host Game Card */}
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+            whileHover={{ scale: 1.02 }}
+            className="group"
+          >
+            <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 h-full">
+              <CardHeader className="text-center pb-6">
+                <motion.div
+                  className="w-20 h-20 bg-gradient-to-br from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:shadow-2xl group-hover:shadow-white/20 transition-all duration-300"
+                  whileHover={{ rotate: 5 }}
+                >
+                  <Users className="w-10 h-10 text-black" />
+                </motion.div>
+                <CardTitle className="text-3xl font-bold text-white mb-2">Host Game</CardTitle>
+                <CardDescription className="text-gray-400 text-lg">
+                  Buat room baru dan undang teman-teman untuk bermain bersama
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button
+                  onClick={handleHostGame}
+                  disabled={isCreating}
+                  className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50"
+                >
+                  {isCreating ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                      className="w-5 h-5 mr-2"
+                    >
+                      <Zap className="w-5 h-5" />
+                    </motion.div>
+                  ) : (
+                    <Play className="w-5 h-5 mr-2" />
+                  )}
+                  {isCreating ? "Membuat Game..." : "Buat Game Baru"}
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
           </div>
 
           {/* Footer */}
@@ -259,11 +253,6 @@ export default function HomePage() {
             transition={{ delay: 1.2, duration: 0.8 }}
             className="text-center mt-16"
           >
-            <div className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 rounded-full border border-white/10">
-              <span className="text-gray-400 text-sm">Dibuat dengan</span>
-              <span className="text-red-400">.</span>
-              <span className="text-gray-400 text-sm">menggunakan Next.js • Tailwind • Supabase</span>
-            </div>
           </motion.div>
         </div>
       </div>
