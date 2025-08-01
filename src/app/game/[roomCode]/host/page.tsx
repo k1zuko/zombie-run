@@ -574,54 +574,54 @@ export default function HostGamePage() {
       />
 
       {/* Completion Popup */}
-<AnimatePresence>
-  {showCompletionPopup && completedPlayers.length > 0 && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" // Lebih transparan (bg-black/30)
-      onClick={() => setShowCompletionPopup(false)}
-    >
-      <motion.div
-        initial={{ scale: 0.8, y: 50 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.8, y: 50 }}
-        className="bg-red-900/60 border border-red-700/50 rounded-lg p-8 max-w-md w-full text-center" // Warna merah (bg-red-900/60)
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-2xl font-bold text-white font-mono mb-4">Selamat Anda Lolos dari Kejaran!</h2>
-        <div className="flex justify-center gap-4 mb-6">
-          {completedPlayers.map((player) => {
-            const character = getCharacterByType(player.character_type)
-            return (
-              <img
-                key={player.id}
-                src={getWorkingImagePath(character)}
-                alt={character.alt}
-                className="w-16 h-16 object-contain"
-              />
-            )
-          })}
-        </div>
-        <div className="text-white font-mono mb-6">
-          <p className="text-lg mb-2">Pemain yang Lolos:</p>
-          <ul className="list-disc list-inside">
-            {completedPlayers.map((player) => (
-              <li key={player.id}>{player.nickname}</li>
-            ))}
-          </ul>
-        </div>
-        <button
-          onClick={() => setShowCompletionPopup(false)}
-          className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
-        >
-          Tutup
-        </button>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+      <AnimatePresence>
+        {showCompletionPopup && completedPlayers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowCompletionPopup(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-white font-mono mb-4">Selamat Anda Lolos dari Kejaran!</h2>
+              <div className="flex justify-center gap-4 mb-6">
+                {completedPlayers.map((player) => {
+                  const character = getCharacterByType(player.character_type)
+                  return (
+                    <img
+                      key={player.id}
+                      src={getWorkingImagePath(character)}
+                      alt={character.alt}
+                      className="w-16 h-16 object-contain"
+                    />
+                  )
+                })}
+              </div>
+              <div className="text-white font-mono mb-6">
+                <p className="text-lg mb-2">Pemain yang Lolos:</p>
+                <ul className="list-disc list-inside">
+                  {completedPlayers.map((player) => (
+                    <li key={player.id}>{player.nickname}</li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => setShowCompletionPopup(false)}
+                className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
+              >
+                Tutup
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

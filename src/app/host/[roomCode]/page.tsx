@@ -13,14 +13,12 @@ export default function HostPage() {
   const params = useParams()
   const router = useRouter()
   const roomCode = params.roomCode as string
-
   const [room, setRoom] = useState<GameRoom | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [copied, setCopied] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connecting")
-  const [countdown, setCountdown] = useState<number | null>(null)
 
   // Fetch room data
   const fetchRoom = useCallback(async () => {
@@ -98,7 +96,7 @@ export default function HostPage() {
         (payload) => {
           console.log("Players change detected:", payload)
           fetchPlayers(room.id)
-        },
+        }
       )
       .on(
         "postgres_changes",
@@ -111,12 +109,11 @@ export default function HostPage() {
         (payload) => {
           console.log("Room change detected:", payload)
           setRoom(payload.new as GameRoom)
-
           if (payload.new.current_phase === "quiz") {
             console.log("Redirecting host to quiz page:", `/game/${roomCode}/host`)
             router.push(`/game/${roomCode}/host`)
           }
-        },
+        }
       )
       .subscribe((status, err) => {
         console.log("Subscription status:", status, err ? err.message : "")
@@ -136,40 +133,6 @@ export default function HostPage() {
     }
   }, [room?.id, fetchPlayers, roomCode, router])
 
-  // Handle countdown from database
-  useEffect(() => {
-    if (!room?.countdown_start) {
-      setCountdown(null)
-      return
-    }
-
-    const countdownStart = room.countdown_start // Already a number (Unix timestamp)
-    const now = Date.now()
-    const elapsed = Math.floor((now - countdownStart) / 1000)
-    const remaining = Math.max(0, 5 - elapsed) // 5 second countdown
-
-    if (remaining > 0) {
-      setCountdown(remaining)
-
-      const timer = setInterval(() => {
-        const currentNow = Date.now()
-        const currentElapsed = Math.floor((currentNow - countdownStart) / 1000)
-        const currentRemaining = Math.max(0, 5 - currentElapsed)
-
-        setCountdown(currentRemaining)
-
-        if (currentRemaining <= 0) {
-          clearInterval(timer)
-          setCountdown(null)
-        }
-      }, 100) // Update every 100ms for smooth countdown
-
-      return () => clearInterval(timer)
-    } else {
-      setCountdown(null)
-    }
-  }, [room?.countdown_start])
-
   const copyRoomCode = async () => {
     await navigator.clipboard.writeText(roomCode)
     setCopied(true)
@@ -184,70 +147,43 @@ export default function HostPage() {
     }
 
     setIsStarting(true)
-
     try {
-      // Set countdown start timestamp as Unix timestamp (milliseconds)
-      const countdownStartTime = Date.now()
-
-      // Update room with countdown start
+      // Update room status
       const { error: roomError } = await supabase
         .from("game_rooms")
         .update({
-          countdown_start: countdownStartTime,
+          status: "playing",
+          current_phase: "quiz",
           updated_at: new Date().toISOString(),
         })
         .eq("id", room.id)
 
       if (roomError) {
-        throw new Error(`Gagal memulai countdown: ${roomError.message}`)
+        throw new Error(`Gagal memperbarui ruangan: ${roomError.message}`)
+      }
+      console.log("Room updated successfully to quiz phase")
+
+      // Create game state
+      const { error: stateError } = await supabase.from("game_states").insert({
+        room_id: room.id,
+        phase: "quiz",
+        time_remaining: room.duration,
+        lives_remaining: 3,
+        target_correct_answers: Math.max(5, players.length * 2),
+        current_correct_answers: 0,
+        current_question_index: 0,
+        status: "playing",
+        created_at: new Date().toISOString(),
+      })
+
+      if (stateError) {
+        throw new Error(`Gagal membuat status permainan: ${stateError.message}`)
       }
 
-      console.log("Countdown started successfully")
-
-      // Wait for countdown to finish, then start the actual game
-      setTimeout(async () => {
-        try {
-          // Update room status to playing
-          const { error: gameStartError } = await supabase
-            .from("game_rooms")
-            .update({
-              status: "playing",
-              current_phase: "quiz",
-              countdown_start: null, // Clear countdown
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", room.id)
-
-          if (gameStartError) {
-            throw new Error(`Gagal memulai game: ${gameStartError.message}`)
-          }
-
-          // Create game state
-          const { error: stateError } = await supabase.from("game_states").insert({
-            room_id: room.id,
-            phase: "quiz",
-            time_remaining: room.duration,
-            lives_remaining: 3,
-            target_correct_answers: Math.max(5, players.length * 2),
-            current_correct_answers: 0,
-            current_question_index: 0,
-            status: "playing",
-            created_at: new Date().toISOString(),
-          })
-
-          if (stateError) {
-            throw new Error(`Gagal membuat status permainan: ${stateError.message}`)
-          }
-
-          console.log("Game started successfully")
-        } catch (error) {
-          console.error("Error starting actual game:", error)
-          alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"))
-        }
-      }, 5000) // 5 second countdown
+      console.log("Game state created successfully")
     } catch (error) {
-      console.error("Error starting countdown:", error)
-      alert("Gagal memulai countdown: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"))
+      console.error("Error starting game:", error)
+      alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"))
     } finally {
       setIsStarting(false)
     }
@@ -293,17 +229,6 @@ export default function HostPage() {
             <h1 className="text-4xl md:text-6xl font-black mb-4 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Zombie Run
             </h1>
-
-            {/* Countdown Display */}
-            {countdown !== null && (
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mb-6">
-                <div className="text-6xl font-mono text-red-500 animate-pulse drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">
-                  {countdown}
-                </div>
-                <div className="text-xl text-red-400 font-mono mt-2">PENYIKSAAN DIMULAI DALAM...</div>
-              </motion.div>
-            )}
-
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -314,7 +239,6 @@ export default function HostPage() {
                 <div className="text-gray-400 text-sm">Kode Game</div>
                 <div className="text-3xl font-mono font-bold text-white tracking-wider">{roomCode}</div>
               </div>
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -396,9 +320,7 @@ export default function HostPage() {
             <Card className="bg-white/5 backdrop-blur-xl border border-white/10">
               <CardContent className="p-6 text-center">
                 <Zap className="w-8 h-8 text-white mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">
-                  {countdown !== null ? "Countdown" : room.status === "waiting" ? "Siap" : "Aktif"}
-                </div>
+                <div className="text-3xl font-bold text-white mb-1">{room.status === "waiting" ? "Siap" : "Aktif"}</div>
                 <div className="text-gray-400 text-sm">Status</div>
               </CardContent>
             </Card>
@@ -517,10 +439,10 @@ export default function HostPage() {
 
             <Button
               onClick={startGame}
-              disabled={players.length === 0 || isStarting || countdown !== null}
+              disabled={players.length === 0 || isStarting}
               className="bg-white text-black hover:bg-gray-200 font-bold px-12 py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
             >
-              {isStarting || countdown !== null ? (
+              {isStarting ? (
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
@@ -531,7 +453,7 @@ export default function HostPage() {
               ) : (
                 <Play className="w-5 h-5 mr-2" />
               )}
-              {countdown !== null ? "Memulai..." : isStarting ? "Memulai Game..." : "Mulai Game"}
+              {isStarting ? "Memulai Game..." : "Mulai Game"}
             </Button>
           </motion.div>
 

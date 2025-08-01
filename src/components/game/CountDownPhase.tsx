@@ -21,8 +21,7 @@ export default function CountdownPhase({ initialCountdown = 10, onCountdownCompl
       console.log("Countdown already completed, skipping setup")
       return
     }
-
-    // Reset countdown to initial value when initialCountdown changes
+// Reset countdown to initial value when initialCountdown changes
     setCountdown(initialCountdown)
 
     timerRef.current = setInterval(() => {

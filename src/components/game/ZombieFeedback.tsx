@@ -7,11 +7,9 @@ import Image from "next/image"
 interface ZombieFeedbackProps {
   isCorrect: boolean | null
   isVisible: boolean
-  canSkip?: boolean
-  onSkip?: () => void
 }
 
-export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, onSkip }: ZombieFeedbackProps) {
+export default function ZombieFeedback({ isCorrect, isVisible }: ZombieFeedbackProps) {
   const [animationKey, setAnimationKey] = useState(0)
   const [showEffects, setShowEffects] = useState(false)
 
@@ -59,7 +57,7 @@ export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, 
               unoptimized
               className="object-contain"
             />
-          </div>   
+          </div>
 
           {/* Zombie chaser (yang mengejar) */}
           {isCorrect === false && (
@@ -95,9 +93,6 @@ export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, 
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-sm font-bold tracking-wider block">KAMU AMAN!</span>
-                    {canSkip && (
-                      <span className="text-xs text-gray-400 font-mono animate-pulse">Tekan SPACE untuk lanjut</span>
-                    )}
                   </div>
                 </>
               ) : (
@@ -108,9 +103,6 @@ export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, 
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-sm font-bold tracking-wider block">ZOMBI MENDEKAT!</span>
-                    {canSkip && (
-                      <span className="text-xs text-gray-400 font-mono animate-pulse">Tekan SPACE untuk lanjut</span>
-                    )}
                   </div>
                 </>
               )}
@@ -131,18 +123,6 @@ export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, 
                   }}
                 />
               ))}
-            </div>
-          )}
-
-          {/* Skip button overlay */}
-          {canSkip && onSkip && (
-            <div
-              className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black/20 hover:bg-black/30 transition-all duration-200"
-              onClick={onSkip}
-            >
-              <div className="bg-gray-800/90 px-3 py-1 rounded-lg border border-gray-600">
-                <span className="text-white font-mono text-sm">Klik atau tekan SPACE</span>
-              </div>
             </div>
           )}
         </div>
@@ -223,15 +203,6 @@ export default function ZombieFeedback({ isCorrect, isVisible, canSkip = false, 
           100% {
             opacity: 0;
             transform: translateY(-100px) rotate(15deg);
-          }
-        }
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-10px);
           }
         }
         .animate-float {

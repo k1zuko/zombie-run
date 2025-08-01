@@ -491,16 +491,15 @@ export default function ResultsPage() {
     if (!playerData) return "Jiwamu lenyap dalam kegelapan... tidak ada jejak yang tersisa..."
     const accuracy = playerData.total > 0 ? (playerData.correct / playerData.total) * 100 : 0
 
-    if (playerData.perfect) return "Kegelapan gemetar di hadapanmu! Penampilan sempurnamu telah mengusir horor!"
+    if (playerData.perfect) return "Kamu tampil sangat sempurna!!"
     if (playerData.eliminated) return "Makhluk malam telah mengklaim dirimu... jeritanmu bergema di kehampaan..."
-    if (accuracy >= 90) return "Monster lari dari kehebatanmu! Hanya yang paling berani yang berani melawanmu!"
-    if (accuracy >= 80) return "Darah menetes dari senjatamu... teror malam tahu namamu!"
-    if (accuracy >= 70) return "Kau bertarung dengan gagah berani, namun kegelapan meninggalkan bekas di jiwamu..."
-    if (accuracy >= 60) return "Horor melukaimu dalam-dalam, namun kau masih berdiri... untuk saat ini..."
-    if (accuracy >= 50) return "Kau selamat... hampir saja. Makhluk itu akan kembali untukmu..."
-    if (accuracy >= 40) return "Malam telah menghancurkanmu. Erangan keluar dari bibirmu yang berdarah..."
-    if (accuracy >= 30) return "Penderitaan menyelimutimu. Bayangan menertawakan penderitaanmu..."
-    if (accuracy >= 20) return "Teror telah melumpuhkanmu. Akhir semakin dekat..."
+    if (accuracy >= 90) return "Kamu tampil sangat hebat "
+    if (accuracy >= 70) return "Kamu cukup hebat"
+    if (accuracy >= 60) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
+    if (accuracy >= 50) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
+    if (accuracy >= 40) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
+    if (accuracy >= 30) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
+    if (accuracy >= 20) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
     return "Kau hanyalah mangsa. Kegelapan menelammu tanpa usaha..."
   }
 
@@ -508,12 +507,12 @@ export default function ResultsPage() {
     if (activity.activity_type === "completion") {
       const { correct_answers, final_health, is_eliminated, completion_type } = activity.activity_data
       if (is_eliminated) {
-        return `${activity.player_nickname} dicabik-cabik oleh kegelapan! (${correct_answers}/${playerData?.total || 10} benar)`
+        return `${activity.player_nickname} Mati (${correct_answers}/${playerData?.total || 10} benar)`
       }
       if (completion_type === "completed") {
-        return `${activity.player_nickname} menaklukkan mimpi buruk! (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
+        return `${activity.player_nickname} Telah selesai bermain! (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
       }
-      return `${activity.player_nickname} melarikan diri dari horor... (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
+      return `${activity.player_nickname} Telah selesai bermain... (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
     }
     if (activity.activity_type === "attack") {
       const { attack_type, attack_data, damage } = activity.activity_data
@@ -522,7 +521,7 @@ export default function ResultsPage() {
       }
       return `${activity.player_nickname} menderita serangan ${attack_type}! (-${damage} HP)`
     }
-    return `${activity.player_nickname} memicu peristiwa tak dikenal...`
+    return `${activity.player_nickname} TERKENA SERANGAN`
   }
 
   const getRandomCharacterGif = () => {
@@ -610,7 +609,7 @@ export default function ResultsPage() {
             </h1>
             <Skull className="w-8 h-8 text-red-500 ml-3 animate-pulse" />
           </div>
-          <p className="text-gray-400 font-mono tracking-widest text-sm">RUANG PENDERITAAN: {roomCode}</p>
+          <p className="text-gray-400 font-mono tracking-widest text-sm">Kode ruangan: {roomCode}</p>
         </motion.div>
 
         {error && (
@@ -681,7 +680,7 @@ export default function ResultsPage() {
                   </div>
                 </div>
 
-                <div className="mb-6">
+                {/* <div className="mb-6">
                   <div className="flex justify-between text-xs text-gray-400 mb-2 tracking-widest">
                     <span>HARGA DARAH DIBAYAR</span>
                     <span>
@@ -692,7 +691,7 @@ export default function ResultsPage() {
                     value={playerData.total > 0 ? (playerData.correct / playerData.total) * 100 : 0}
                     className="h-2 bg-gray-900 border border-red-900/50"
                   />
-                </div>
+                </div> */}
               </div>
             </div>
           </HorrorCard>
@@ -708,8 +707,8 @@ export default function ResultsPage() {
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Skull className="w-5 h-5 mr-2 text-red-500" />
-                  STATISTIK RUANGAN
-                  <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge>
+                  INFORMASI RUANGAN
+                  {/* <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge> */}
                 </h3>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -735,7 +734,7 @@ export default function ResultsPage() {
 
                   <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
                     <div className="text-2xl font-bold text-purple-400 font-mono">{roomStats.average_health.toFixed(1)}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">RATA-RATA NYAWA</div>
+                    <div className="text-xs text-gray-400 tracking-widest">RATA-RATA SISA DARAH PEMAIN</div>
                   </div>
                 </div>
               </div>
@@ -753,8 +752,8 @@ export default function ResultsPage() {
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
-                  PAPAN PERINGKAT BERCERMIN DARAH
-                  <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge>
+                    URUTAN PEMENANG
+                  {/* <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge> */}
                 </h3>
 
                 <div className="space-y-2">
@@ -822,8 +821,8 @@ export default function ResultsPage() {
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Clock className="w-5 h-5 mr-2 text-purple-400" />
-                  HOROR TERBARU
-                  <Badge className="ml-2 bg-purple-900 text-xs animate-pulse border border-purple-700">LANGSUNG</Badge>
+                  INFO PEMAIN
+                  {/* <Badge className="ml-2 bg-purple-900 text-xs animate-pulse border border-purple-700">Live</Badge> */}
                 </h3>
 
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-2">

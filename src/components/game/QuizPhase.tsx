@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -51,7 +50,6 @@ export default function QuizPhase({
   const [correctAnswers, setCorrectAnswers] = useState(resumeState?.correctAnswers || 0)
   const [showFeedback, setShowFeedback] = useState(false)
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null)
-  const [canSkipFeedback, setCanSkipFeedback] = useState(false)
   const [isProcessingAnswer, setIsProcessingAnswer] = useState(false)
 
   const currentQuestion = getQuestionByIndex(currentQuestionIndex)
@@ -176,13 +174,12 @@ export default function QuizPhase({
       `Redirecting to results: health=${health}, correct=${correct}, total=${total}, eliminated=${isEliminated}, perfect=${isPerfect}`,
     )
 
-    // Simpan penyelesaian game sebelum pengalihan
     saveGameCompletion(health, correct, total, isEliminated).then(() => {
       const urlParams = new URLSearchParams({
         health: health.toString(),
         correct: correct.toString(),
         total: total.toString(),
-        nickname: encodeURIComponent(currentPlayer.nickname), // Tambahkan nickname
+        nickname: encodeURIComponent(currentPlayer.nickname),
         ...(isEliminated && { eliminated: "true" }),
         ...(isPerfect && { perfect: "true" }),
       })
@@ -202,55 +199,82 @@ export default function QuizPhase({
   }, [])
 
   useEffect(() => {
-    if (timeLeft > 0 && !isAnswered) {
+    // Periksa kesehatan pemain setiap kali playerHealth berubah
+    if (playerHealth <= 0) {
+      console.log("Player eliminated, redirecting to results")
+      setShowFeedback(false) // Hentikan feedback jika sedang ditampilkan
+      redirectToResults(0, correctAnswers, currentQuestionIndex + 1, true)
+    }
+  }, [playerHealth, correctAnswers, currentQuestionIndex])
+
+  useEffect(() => {
+    // Timer terus berjalan kecuali game selesai
+    if (timeLeft > 0 && playerHealth > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000)
       return () => clearTimeout(timer)
     } else if (timeLeft === 0) {
+      console.log("Time's up, redirecting to results")
       setIsAnswered(true)
-      redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0)
+      saveGameCompletion(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0).then(() => {
+        redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0)
+      })
     }
-  }, [timeLeft, isAnswered, playerHealth, correctAnswers, currentQuestionIndex])
+  }, [timeLeft, playerHealth])
 
   useEffect(() => {
     if (showFeedback) {
-      const skipTimer = setTimeout(() => {
-        setCanSkipFeedback(true)
-      }, 600)
-      return () => clearTimeout(skipTimer)
+      const feedbackTimer = setTimeout(() => {
+        setShowFeedback(false)
+        if (playerHealth <= 0) {
+          console.log("Player eliminated during feedback, redirecting to results")
+          redirectToResults(0, correctAnswers, currentQuestionIndex + 1, true)
+        } else if (currentQuestionIndex + 1 >= totalQuestions) {
+          console.log("All questions answered, redirecting to results")
+          redirectToResults(playerHealth, correctAnswers, totalQuestions, false, correctAnswers === totalQuestions)
+        } else {
+          nextQuestion()
+        }
+      }, FEEDBACK_DURATION)
+      return () => clearTimeout(feedbackTimer)
     }
-  }, [showFeedback])
+  }, [showFeedback, playerHealth, correctAnswers, currentQuestionIndex])
 
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (e.code === "Space" && canSkipFeedback && showFeedback) {
-        e.preventDefault()
-        skipFeedback()
-      }
-    }
-    window.addEventListener("keydown", handleKeyPress)
-    return () => window.removeEventListener("keydown", handleKeyPress)
-  }, [canSkipFeedback, showFeedback])
+  const nextQuestion = () => {
+    setCurrentQuestionIndex(currentQuestionIndex + 1)
+    setSelectedAnswer(null)
+    setIsAnswered(false)
+    setIsCorrect(null)
+  }
 
-  const skipFeedback = () => {
-    setShowFeedback(false)
-    setCanSkipFeedback(false)
+  const handleAnswerSelect = async (answer: string) => {
+    if (isAnswered || !currentQuestion || isProcessingAnswer) return
 
-    if (playerHealth <= 0) {
-      redirectToResults(0, correctAnswers, currentQuestionIndex + 1, true)
-    } else if (currentQuestionIndex + 1 >= totalQuestions) {
-      redirectToResults(playerHealth, correctAnswers, totalQuestions, false, correctAnswers === totalQuestions)
+    setSelectedAnswer(answer)
+    setIsAnswered(true)
+
+    if (answer === currentQuestion.correctAnswer) {
+      await handleCorrectAnswer()
     } else {
-      nextQuestion()
+      await handleWrongAnswer()
     }
+  }
+
+  const handleCorrectAnswer = async () => {
+    if (isProcessingAnswer) return
+
+    const newCorrectAnswers = correctAnswers + 1
+    setCorrectAnswers(newCorrectAnswers)
+    setIsCorrect(true)
+    setShowFeedback(true)
+
+    await saveAnswerAndUpdateHealth(selectedAnswer || "", true)
   }
 
   const handleWrongAnswer = async () => {
     if (isProcessingAnswer) return
 
-    setIsAnswered(true)
     setIsCorrect(false)
     setShowFeedback(true)
-    setCanSkipFeedback(false)
 
     const result = await saveAnswerAndUpdateHealth(selectedAnswer || "TIME_UP", false)
     let newHealth = playerHealth
@@ -259,61 +283,6 @@ export default function QuizPhase({
       setPlayerHealth(newHealth)
     } else if (typeof result === "number") {
       newHealth = result
-    }
-
-    setTimeout(() => {
-      if (showFeedback) {
-        setShowFeedback(false)
-        if (newHealth <= 0) {
-          redirectToResults(0, correctAnswers, currentQuestionIndex + 1, true)
-        } else if (currentQuestionIndex + 1 >= totalQuestions) {
-          redirectToResults(newHealth, correctAnswers, totalQuestions, false, correctAnswers === totalQuestions)
-        } else {
-          nextQuestion()
-        }
-      }
-    }, FEEDBACK_DURATION)
-  }
-
-  const handleCorrectAnswer = async () => {
-    if (isProcessingAnswer) return
-
-    const newCorrectAnswers = correctAnswers + 1
-    setCorrectAnswers(newCorrectAnswers)
-    setIsAnswered(true)
-    setIsCorrect(true)
-    setShowFeedback(true)
-    setCanSkipFeedback(false)
-
-    await saveAnswerAndUpdateHealth(selectedAnswer || "", true)
-
-    setTimeout(() => {
-      if (showFeedback) {
-        setShowFeedback(false)
-        if (currentQuestionIndex + 1 >= totalQuestions) {
-          redirectToResults(playerHealth, newCorrectAnswers, totalQuestions, false, newCorrectAnswers === totalQuestions)
-        } else {
-          nextQuestion()
-        }
-      }
-    }, FEEDBACK_DURATION)
-  }
-
-  const nextQuestion = () => {
-    setCurrentQuestionIndex(currentQuestionIndex + 1)
-    setSelectedAnswer(null)
-    setIsAnswered(false)
-  }
-
-  const handleAnswerSelect = async (answer: string) => {
-    if (isAnswered || !currentQuestion || isProcessingAnswer) return
-
-    setSelectedAnswer(answer)
-
-    if (answer === currentQuestion.correctAnswer) {
-      await handleCorrectAnswer()
-    } else {
-      await handleWrongAnswer()
     }
   }
 
@@ -495,14 +464,7 @@ export default function QuizPhase({
         </Card>
       </div>
 
-      <ZombieFeedback isCorrect={isCorrect} isVisible={showFeedback} canSkip={canSkipFeedback} onSkip={skipFeedback} />
-
-      {isClient && (timeLeft <= 15 || dangerLevel >= 3) && (
-        <div
-          className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none"
-          style={{ animationDuration: `${Math.max(0.5, timeLeft * 0.3)}s` }}
-        />
-      )}
+      <ZombieFeedback isCorrect={isCorrect} isVisible={showFeedback} />
     </div>
   )
 }

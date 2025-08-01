@@ -6,7 +6,6 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type GameRoom = {
-  countdown_start: string | number | Date
   id: string
   room_code: string
   host_player_id: string | null // Combines host_id and host_player_id
