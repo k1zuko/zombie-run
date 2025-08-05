@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Clock, Skull, Zap, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { getQuestionByIndex, getTotalQuestions } from "@/data/horror-questions";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { motion, AnimatePresence } from "framer-motion";
 import ZombieFeedback from "./ZombieFeedback";
 
 interface QuizPhaseProps {
@@ -22,7 +23,7 @@ interface QuizPhaseProps {
     health: number;
     correctAnswers: number;
     currentIndex: number;
-    speed?: number; // Tambahkan speed di resumeState
+    speed?: number;
     isResuming: boolean;
   };
 }
@@ -42,16 +43,18 @@ export default function QuizPhase({
   const roomCode = params.roomCode as string;
 
   const [timeLeft, setTimeLeft] = useState(300);
+  const [inactivityCountdown, setInactivityCountdown] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(resumeState?.currentIndex || 0);
   const [playerHealth, setPlayerHealth] = useState(resumeState?.health || 3);
-  const [playerSpeed, setPlayerSpeed] = useState(resumeState?.speed || 20); // State untuk kecepatan
+  const [playerSpeed, setPlayerSpeed] = useState(resumeState?.speed || 20);
   const [correctAnswers, setCorrectAnswers] = useState(resumeState?.correctAnswers || 0);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [isProcessingAnswer, setIsProcessingAnswer] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentQuestion = getQuestionByIndex(currentQuestionIndex);
   const totalQuestions = getTotalQuestions();
@@ -98,18 +101,24 @@ export default function QuizPhase({
     try {
       setIsProcessingAnswer(true);
 
+      const newSpeed = isCorrectAnswer ? Math.min(playerSpeed + 5, 100) : playerSpeed; // Cap speed at 100
+      console.log(`Menyimpan jawaban: isCorrect=${isCorrectAnswer}, speed=${newSpeed}`);
+
       const { error: answerError } = await supabase.from("player_answers").insert({
         player_id: currentPlayer.id,
         room_id: room.id,
         question_index: currentQuestionIndex,
         answer: answer,
         is_correct: isCorrectAnswer,
+        speed: newSpeed,
       });
 
       if (answerError) {
         console.error("Gagal menyimpan jawaban:", answerError);
         return false;
       }
+
+      setInactivityCountdown(null); // Reset inactivity countdown on answer
 
       if (isCorrectAnswer) {
         const { data: speedResult, error: speedError } = await supabase.rpc("handle_correct_answer_speed", {
@@ -124,7 +133,7 @@ export default function QuizPhase({
           return false;
         }
 
-        console.log("Hasil kecepatan:", speedResult);
+        console.log("Hasil kecepatan dari RPC:", speedResult);
 
         if (speedResult) {
           setPlayerSpeed(speedResult.new_speed);
@@ -164,6 +173,10 @@ export default function QuizPhase({
   };
 
   const syncHealthAndSpeedFromDatabase = async () => {
+    if (!room?.id || !currentPlayer?.id) {
+      console.log("⚠️ room or currentPlayer is null, skipping sync");
+      return;
+    }
     try {
       const { data, error } = await supabase.rpc("get_player_health", {
         p_player_id: currentPlayer.id,
@@ -176,13 +189,13 @@ export default function QuizPhase({
       }
 
       if (data !== null && data !== playerHealth) {
-        console.log(`Kesehatan disinkronkan dari database: ${data}`);
+        console.log(`Kesehatan disinkronkan dari ${playerHealth} ke ${data}`);
         setPlayerHealth(data);
       }
 
       const { data: speedData, error: speedError } = await supabase
         .from("player_health_states")
-        .select("speed")
+        .select("speed, last_answer_time")
         .eq("player_id", currentPlayer.id)
         .eq("room_id", room.id)
         .single();
@@ -193,11 +206,53 @@ export default function QuizPhase({
       }
 
       if (speedData && speedData.speed !== playerSpeed) {
-        console.log(`Kecepatan disinkronkan dari database: ${speedData.speed}`);
+        console.log(`Kecepatan disinkronkan dari ${playerSpeed} ke ${speedData.speed}`);
         setPlayerSpeed(speedData.speed);
       }
     } catch (error) {
       console.error("Error saat sinkronisasi kesehatan dan kecepatan:", error);
+    }
+  };
+
+  const checkInactivityPenalty = async () => {
+    if (!room?.id || !currentPlayer?.id || playerHealth <= 0) {
+      console.log("⚠️ Skipping inactivity penalty check: invalid room, player, or player eliminated");
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from("player_health_states")
+        .select("last_answer_time, speed")
+        .eq("player_id", currentPlayer.id)
+        .eq("room_id", room.id)
+        .single();
+
+      if (error) {
+        console.error("Gagal memeriksa ketidakaktifan:", error);
+        return;
+      }
+
+      const lastAnswerTime = new Date(data.last_answer_time).getTime();
+      const currentTime = Date.now();
+      const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
+
+      if (timeSinceLastAnswer >= 6 && timeSinceLastAnswer < 10) {
+        setInactivityCountdown(Math.ceil(10 - timeSinceLastAnswer));
+      } else if (timeSinceLastAnswer >= 10 && data.speed > 20) {
+        const newSpeed = Math.max(20, data.speed - 10);
+        console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
+        await supabase
+          .from("player_health_states")
+          .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
+          .eq("player_id", currentPlayer.id)
+          .eq("room_id", room.id);
+        setPlayerSpeed(newSpeed);
+        setInactivityCountdown(null);
+      } else {
+        setInactivityCountdown(null);
+      }
+    } catch (error) {
+      console.error("Error di checkInactivityPenalty:", error);
     }
   };
 
@@ -211,6 +266,11 @@ export default function QuizPhase({
     console.log(
       `Mengalihkan ke hasil: health=${health}, correct=${correct}, total=${total}, eliminated=${isEliminated}, perfect=${isPerfect}`
     );
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
     saveGameCompletion(health, correct, total, isEliminated).then(() => {
       const urlParams = new URLSearchParams({
@@ -228,9 +288,14 @@ export default function QuizPhase({
 
   useEffect(() => {
     syncHealthAndSpeedFromDatabase();
-    const syncInterval = setInterval(syncHealthAndSpeedFromDatabase, 2000);
+    const syncInterval = setInterval(syncHealthAndSpeedFromDatabase, 2000); // Reduced frequency to 2s
     return () => clearInterval(syncInterval);
   }, [currentPlayer.id, room.id]);
+
+  useEffect(() => {
+    const penaltyInterval = setInterval(checkInactivityPenalty, 1000);
+    return () => clearInterval(penaltyInterval);
+  }, [currentPlayer.id, room.id, playerHealth]);
 
   useEffect(() => {
     setIsClient(true);
@@ -245,17 +310,33 @@ export default function QuizPhase({
   }, [playerHealth, correctAnswers, currentQuestionIndex]);
 
   useEffect(() => {
-    if (timeLeft > 0 && playerHealth > 0) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0) {
-      console.log("Waktu habis, mengalihkan ke hasil");
-      setIsAnswered(true);
-      saveGameCompletion(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0).then(() => {
-        redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0);
-      });
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
-  }, [timeLeft, playerHealth]);
+
+    if (timeLeft > 0 && playerHealth > 0) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            console.log("Waktu habis, mengalihkan ke hasil");
+            setIsAnswered(true);
+            saveGameCompletion(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0).then(() => {
+              redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0);
+            });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [timeLeft, playerHealth, correctAnswers, currentQuestionIndex]);
 
   useEffect(() => {
     if (showFeedback) {
@@ -380,6 +461,23 @@ export default function QuizPhase({
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {inactivityCountdown !== null && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-900/90 text-white font-mono text-sm px-4 py-2 rounded-lg shadow-lg border border-red-500/50 animate-pulse"
+          >
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-300" />
+              <span>Peringatan: Tidak aktif! Penalti kecepatan dalam {inactivityCountdown}s</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="relative z-10 container mx-auto px-4 py-8 pb-24">
         <div className="text-center mb-8">

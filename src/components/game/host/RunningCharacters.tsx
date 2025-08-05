@@ -207,7 +207,7 @@ export default function RunningCharacters({
               />
 
               {isZombieTarget && !isEliminated && (
-                <div className="absolute -inset-2 border-2 border-red-500 rounded-full animate-pulse" />
+              <div className="absolute -inset-2 border-2 border-red-500 rounded-full animate-pulse" />
               )}
             </div>
           </div>
