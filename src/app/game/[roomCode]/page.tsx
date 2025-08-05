@@ -1,3 +1,4 @@
+// src/app/game/[roomCode]/page.tsx
 "use client"
 
 import type React from "react"
@@ -9,9 +10,8 @@ import { supabase } from "@/lib/supabase"
 import LoadingScreen from "@/components/game/LoadingScreen"
 import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
-import GameOverScreen from "@/components/game/GameOverScreen"
 
-// Define interfaces (using imported types from useGameData)
+// Define interfaces
 interface PlayerHealthState {
   playerId: string
   health: number
@@ -62,6 +62,19 @@ function UnknownPhase({ phase, room, gameState }: { phase: string; room: Transfo
         >
           Reload Page
         </button>
+      </div>
+    </div>
+  )
+}
+
+// New GameOverAnimation component
+function GameOverAnimation({ isUnderAttack }: { isUnderAttack: boolean }) {
+  return (
+    <div className={`min-h-screen flex items-center justify-center relative overflow-hidden ${isUnderAttack ? "animate-pulse bg-red-900/20" : ""}`}>
+      <div className="absolute inset-0 bg-gradient-to-br from-red-900/30 via-black to-purple-900/30 opacity-90" />
+      <div className="text-center z-10 p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-xl">
+        <p className="text-red-500 text-4xl font-bold mb-4 animate-bounce">💀 GAME OVER 💀</p>
+        <p className="text-gray-300 text-lg mb-4">You have been captured by the zombies!</p>
       </div>
     </div>
   )
@@ -332,10 +345,12 @@ export default function GamePage() {
   useEffect(() => {
     if (gameState?.phase === "finished" && isMountedRef.current) {
       saveGameCompletion().then(() => {
-        router.push(`/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}`)
+        router.push(
+          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${quizState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=${quizState.health <= 0}`
+        )
       })
     }
-  }, [gameState?.phase, roomCode, nickname, saveGameCompletion, router])
+  }, [gameState?.phase, roomCode, nickname, quizState, saveGameCompletion, router])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -362,14 +377,7 @@ export default function GamePage() {
   if (isGameOver && showCaptureAnimation && currentPlayer) {
     return (
       <GameWrapper>
-        <div className={`${attackAnimation ? "animate-pulse bg-red-900/20" : ""}`}>
-          <GameOverScreen
-            currentPlayer={currentPlayer}
-            wrongAnswers={wrongAnswers}
-            restartGame={restartGame}
-            gameLogic={gameLogic}
-          />
-        </div>
+        <GameOverAnimation isUnderAttack={attackAnimation} />
       </GameWrapper>
     )
   }
