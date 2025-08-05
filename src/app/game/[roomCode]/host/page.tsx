@@ -1,6 +1,7 @@
+
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import PlayersPanel from "@/components/game/host/PlayersPanel";
@@ -37,6 +38,7 @@ interface PlayerHealthState {
   speed: number;
   is_being_attacked: boolean;
   last_attack_time: string;
+  last_answer_time: string;
 }
 
 interface PlayerState {
@@ -47,7 +49,7 @@ interface PlayerState {
   position: number;
   lastAttackTime: number;
   attackIntensity: number;
-  countdown?: number; // Tambahkan countdown untuk setiap pemain
+  countdown?: number;
 }
 
 interface ZombieState {
@@ -115,27 +117,21 @@ const characterGifs = [
 
 export default function HostGamePage() {
   const params = useParams();
+  const router = useRouter();
   const roomCode = params.roomCode as string;
 
-  // Game animation states
   const [animationTime, setAnimationTime] = useState(0);
   const [gameMode, setGameMode] = useState<"normal" | "panic">("normal");
   const [isClient, setIsClient] = useState(false);
   const [screenWidth, setScreenWidth] = useState(1200);
   const [imageLoadStatus, setImageLoadStatus] = useState<{ [key: string]: boolean }>({});
-
-  // Game data states
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameRoom, setGameRoom] = useState<GameRoom | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completedPlayers, setCompletedPlayers] = useState<Player[]>([]);
   const [showCompletionPopup, setShowCompletionPopup] = useState(false);
-
-  // Enhanced player states with real-time health and speed sync from database
   const [playerStates, setPlayerStates] = useState<{ [playerId: string]: PlayerState }>({});
   const [playerHealthStates, setPlayerHealthStates] = useState<{ [playerId: string]: PlayerHealthState }>({});
-
-  // Zombie attack system
   const [zombieState, setZombieState] = useState<ZombieState>({
     isAttacking: false,
     targetPlayerId: null,
@@ -143,17 +139,15 @@ export default function HostGamePage() {
     basePosition: 500,
     currentPosition: 500,
   });
-
-  // Visual effects
+  const [attackQueue, setAttackQueue] = useState<string[]>([]);
   const [recentAttacks, setRecentAttacks] = useState<Set<string>>(new Set());
   const [backgroundFlash, setBackgroundFlash] = useState(false);
+  const attackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get character data by type
   const getCharacterByType = (type: string) => {
     return characterGifs.find((char) => char.type === type) || characterGifs[0];
   };
 
-  // Initialize player states with real health and speed from database
   const initializePlayerStates = useCallback((playersData: Player[], healthData: PlayerHealthState[]) => {
     const newStates: { [playerId: string]: PlayerState } = {};
     const newHealthStates: { [playerId: string]: PlayerHealthState } = {};
@@ -161,17 +155,19 @@ export default function HostGamePage() {
     playersData.forEach((player, index) => {
       const healthState = healthData.find((h) => h.player_id === player.id);
       const currentHealth = healthState?.health ?? 3;
-      const currentSpeed = healthState?.speed ?? 20;
+      const currentSpeed = healthState?.speed ?? 20; // Default speed to 20 if undefined
+      const isBeingAttacked = healthState?.is_being_attacked ?? false;
+      const lastAttackTime = healthState ? new Date(healthState.last_attack_time).getTime() : 0;
 
       newStates[player.id] = {
         id: player.id,
         health: currentHealth,
         speed: currentSpeed,
-        isBeingAttacked: healthState?.is_being_attacked ?? false,
+        isBeingAttacked,
         position: index,
-        lastAttackTime: healthState ? new Date(healthState.last_attack_time).getTime() : 0,
+        lastAttackTime,
         attackIntensity: 0,
-        countdown: undefined, // Initialize countdown as undefined
+        countdown: currentSpeed <= 30 && !isBeingAttacked ? 6 : undefined,
       };
 
       if (healthState) {
@@ -183,9 +179,33 @@ export default function HostGamePage() {
     setPlayerHealthStates(newHealthStates);
   }, []);
 
-  // Enhanced zombie attack animation
   const handleZombieAttack = useCallback((playerId: string, newHealth: number, newSpeed: number) => {
-    console.log(`🧟 Zombie menyerang pemain ${playerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
+    console.log(`🧟 Mulai serangan pada pemain ${playerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
+
+    const playerState = playerStates[playerId];
+    if (!playerState || playerState.health <= 0 || !players.find((p) => p.id === playerId)?.is_alive) {
+      console.log(`⚠️ Pemain ${playerId} tidak valid untuk diserang (kesehatan: ${playerState?.health}, is_alive: ${players.find((p) => p.id === playerId)?.is_alive})`);
+      setAttackQueue((prev) => prev.filter((id) => id !== playerId));
+      return;
+    }
+
+    if (zombieState.isAttacking) {
+      console.log(`⚠️ Zombie sudah menyerang pemain lain (${zombieState.targetPlayerId}), menambahkan ${playerId} ke antrian`);
+      setAttackQueue((prev) => {
+        if (!prev.includes(playerId)) {
+          return [...prev, playerId];
+        }
+        return prev;
+      });
+      return;
+    }
+
+    // Clear any existing interval to prevent overlap
+    if (attackIntervalRef.current) {
+      clearInterval(attackIntervalRef.current);
+      attackIntervalRef.current = null;
+    }
+
     setZombieState({
       isAttacking: true,
       targetPlayerId: playerId,
@@ -203,7 +223,7 @@ export default function HostGamePage() {
         isBeingAttacked: true,
         lastAttackTime: Date.now(),
         attackIntensity: 0.5,
-        countdown: undefined, // Reset countdown after attack
+        countdown: undefined,
       },
     }));
 
@@ -212,21 +232,26 @@ export default function HostGamePage() {
     setGameMode("panic");
 
     let progress = 0;
-    const attackInterval = setInterval(() => {
-      progress += 0.05;
+    attackIntervalRef.current = setInterval(() => {
+      progress += 0.02; // Slower progress for smoother animation (50ms * 50 = 2.5s duration)
       setZombieState((prev) => ({
         ...prev,
         attackProgress: progress,
         currentPosition: prev.basePosition * (1 - progress * 0.8),
       }));
 
-      if (progress >= 0.5 && progress < 0.55) {
+      if (progress >= 0.5 && progress < 0.52) {
         setBackgroundFlash(true);
         console.log("💥 Zombie mengenai!");
       }
 
       if (progress >= 1) {
-        clearInterval(attackInterval);
+        console.log(`✅ Serangan selesai untuk pemain ${playerId}`);
+        if (attackIntervalRef.current) {
+          clearInterval(attackIntervalRef.current);
+          attackIntervalRef.current = null;
+        }
+
         setZombieState({
           isAttacking: false,
           targetPlayerId: null,
@@ -244,6 +269,19 @@ export default function HostGamePage() {
           },
         }));
 
+        supabase
+          .from("player_health_states")
+          .update({
+            is_being_attacked: false,
+            last_attack_time: new Date().toISOString(),
+          })
+          .eq("player_id", playerId)
+          .eq("room_id", gameRoom?.id)
+          .then(({ error }) => {
+            if (error) console.error(`⚠️ Gagal mereset is_being_attacked untuk ${playerId}:`, error);
+            else console.log(`✅ Status is_being_attacked untuk ${playerId} direset di Supabase`);
+          });
+
         setRecentAttacks((prev) => {
           const newSet = new Set(prev);
           newSet.delete(playerId);
@@ -252,25 +290,83 @@ export default function HostGamePage() {
 
         setBackgroundFlash(false);
         setGameMode("normal");
-        console.log("✅ Urutan serangan zombie selesai");
+
+        // Process next player in queue
+        setAttackQueue((prev) => {
+          const nextQueue = prev.filter((id) => id !== playerId);
+          if (nextQueue.length > 0) {
+            const nextPlayerId = nextQueue[0];
+            const nextState = playerStates[nextPlayerId];
+            if (nextState && nextState.speed <= 30 && nextState.health > 0 && players.find((p) => p.id === nextPlayerId)?.is_alive) {
+              console.log(`📋 Memproses antrian berikutnya: ${nextPlayerId}`);
+              supabase
+                .from("player_health_states")
+                .update({
+                  health: Math.max(0, nextState.health - 1),
+                  speed: nextState.speed,
+                  is_being_attacked: true,
+                  last_attack_time: new Date().toISOString(),
+                })
+                .eq("player_id", nextPlayerId)
+                .eq("room_id", gameRoom?.id)
+                .then(({ error }) => {
+                  if (error) {
+                    console.error(`⚠️ Gagal memperbarui status kesehatan untuk ${nextPlayerId}:`, error);
+                    setAttackQueue((prev) => prev.filter((id) => id !== nextPlayerId));
+                    return;
+                  }
+                  handleZombieAttack(nextPlayerId, Math.max(0, nextState.health - 1), nextState.speed);
+                });
+            } else {
+              console.log(`⚠️ Pemain berikutnya ${nextPlayerId} tidak memenuhi syarat (kecepatan: ${nextState?.speed}, kesehatan: ${nextState?.health})`);
+              return nextQueue.filter((id) => id !== nextPlayerId);
+            }
+          }
+          return nextQueue;
+        });
       }
     }, 50);
 
+    // Fallback timeout to ensure attack doesn't hang
     setTimeout(() => {
-      clearInterval(attackInterval);
-      setZombieState({
-        isAttacking: false,
-        targetPlayerId: null,
-        attackProgress: 0,
-        basePosition: 500,
-        currentPosition: 500,
-      });
-      setGameMode("normal");
-      setBackgroundFlash(false);
+      if (attackIntervalRef.current && zombieState.isAttacking) {
+        console.log(`🛑 Timeout cadangan: Memaksa reset serangan untuk ${playerId}`);
+        clearInterval(attackIntervalRef.current);
+        attackIntervalRef.current = null;
+        setZombieState({
+          isAttacking: false,
+          targetPlayerId: null,
+          attackProgress: 0,
+          basePosition: 500,
+          currentPosition: 500,
+        });
+        setPlayerStates((prev) => ({
+          ...prev,
+          [playerId]: {
+            ...prev[playerId],
+            isBeingAttacked: false,
+            attackIntensity: 0,
+          },
+        }));
+        supabase
+          .from("player_health_states")
+          .update({
+            is_being_attacked: false,
+            last_attack_time: new Date().toISOString(),
+          })
+          .eq("player_id", playerId)
+          .eq("room_id", gameRoom?.id)
+          .then(({ error }) => {
+            if (error) console.error(`⚠️ Gagal mereset is_being_attacked untuk ${playerId} (timeout):`, error);
+            else console.log(`✅ Status is_being_attacked untuk ${playerId} direset di Supabase (timeout)`);
+          });
+        setBackgroundFlash(false);
+        setGameMode("normal");
+        setAttackQueue((prev) => prev.filter((id) => id !== playerId));
+      }
     }, 3000);
-  }, []);
+  }, [zombieState, playerStates, players, gameRoom]);
 
-  // Handle correct answer
   const handleCorrectAnswer = useCallback((playerId: string, newSpeed: number) => {
     console.log(`✅ Pemain ${playerId} menjawab benar! Kecepatan: ${newSpeed}`);
     setPlayerStates((prev) => ({
@@ -279,90 +375,208 @@ export default function HostGamePage() {
         ...prev[playerId],
         speed: newSpeed,
         lastAttackTime: Date.now(),
-        countdown: undefined, // Reset countdown on correct answer
+        countdown: undefined,
+        isBeingAttacked: false,
       },
     }));
-  }, []);
+    setAttackQueue((prev) => prev.filter((id) => id !== playerId));
+    if (attackIntervalRef.current && zombieState.targetPlayerId === playerId) {
+      console.log(`🛑 Menghentikan serangan zombie karena jawaban benar dari ${playerId}`);
+      clearInterval(attackIntervalRef.current);
+      attackIntervalRef.current = null;
+      setZombieState({
+        isAttacking: false,
+        targetPlayerId: null,
+        attackProgress: 0,
+        basePosition: 500,
+        currentPosition: 500,
+      });
+      setBackgroundFlash(false);
+      setGameMode("normal");
+    }
+    supabase
+      .from("player_health_states")
+      .update({
+        speed: newSpeed,
+        is_being_attacked: false,
+        last_answer_time: new Date().toISOString(),
+      })
+      .eq("player_id", playerId)
+      .eq("room_id", gameRoom?.id)
+      .then(({ error }) => {
+        if (error) console.error(`⚠️ Gagal memperbarui kecepatan untuk ${playerId}:`, error);
+        else console.log(`✅ Kecepatan ${playerId} diperbarui ke ${newSpeed} di Supabase`);
+      });
+  }, [zombieState, playerStates, gameRoom]);
 
-  // Check for low speed and initiate countdown
   const checkLowSpeedPlayers = useCallback(() => {
-    if (zombieState.isAttacking) return; // Don't start new countdowns during an attack
+    if (!gameRoom) {
+      console.log("⚠️ gameRoom kosong, lewati pemeriksaan kecepatan rendah");
+      return;
+    }
+    console.log("🔍 Memeriksa pemain dengan kecepatan rendah:", { playerStates, zombieState, attackQueue });
 
-    Object.entries(playerStates).forEach(([playerId, state]) => {
-      if (state.isBeingAttacked || state.health <= 0 || !players.find((p) => p.id === playerId)?.is_alive) return;
+    const eligiblePlayers = Object.entries(playerStates)
+      .filter(([playerId, state]) => {
+        const player = players.find((p) => p.id === playerId);
+        const lastAttackTime = state.lastAttackTime || 0;
+        const timeSinceLastAttack = (Date.now() - lastAttackTime) / 1000;
+        const isEligible =
+          state.speed <= 30 &&
+          !state.isBeingAttacked &&
+          state.health > 0 &&
+          player?.is_alive &&
+          !recentAttacks.has(playerId) &&
+          timeSinceLastAttack >= 10; // Cegah serangan terlalu cepat
+        console.log(`Pemain ${playerId} memenuhi syarat: ${isEligible}, Kecepatan: ${state.speed}, Nyawa: ${state.health}, Waktu sejak serangan terakhir: ${timeSinceLastAttack}s`);
+        return isEligible;
+      })
+      .sort(([, stateA], [, stateB]) => stateA.speed - stateB.speed);
 
-      if (state.speed <= 30 && state.countdown === undefined) {
-        // Start countdown
+    if (eligiblePlayers.length === 0) {
+      console.log("🚫 Tidak ada pemain yang memenuhi syarat untuk diserang");
+      setAttackQueue([]);
+      return;
+    }
+
+    eligiblePlayers.forEach(([playerId, state]) => {
+      if (!attackQueue.includes(playerId)) {
+        console.log(`📋 Menambahkan ${playerId} ke antrian serangan (Kecepatan: ${state.speed})`);
+        setAttackQueue((prev) => [...prev, playerId]);
+      }
+    });
+
+    if (attackQueue.length > 0 && !zombieState.isAttacking) {
+      const playerId = attackQueue[0];
+      const state = playerStates[playerId];
+      if (!state) {
+        console.log(`⚠️ Pemain ${playerId} tidak ditemukan di playerStates, menghapus dari antrian`);
+        setAttackQueue((prev) => prev.filter((id) => id !== playerId));
+        return;
+      }
+
+      if (state.countdown === undefined) {
+        console.log(`⏳ Memulai countdown 6 detik untuk ${playerId} (Kecepatan: ${state.speed})`);
         setPlayerStates((prev) => ({
           ...prev,
           [playerId]: {
             ...prev[playerId],
-            countdown: 6, // Start at 6 seconds
+            countdown: 6,
           },
         }));
-
-        const countdownInterval = setInterval(() => {
-          setPlayerStates((prev) => {
-            const currentState = prev[playerId];
-            if (!currentState || currentState.countdown === undefined) {
-              clearInterval(countdownInterval);
-              return prev;
-            }
-
-            const newCountdown = currentState.countdown - 1;
-            if (newCountdown <= 0 && currentState.speed <= 30) {
-              // Trigger attack if countdown reaches 0 and speed still <= 30
-              clearInterval(countdownInterval);
-              const newHealth = Math.max(0, currentState.health - 1);
-              const newSpeed = currentState.speed;
-
-              // Update database
-              supabase
-                .from("player_health_states")
-                .update({
-                  health: newHealth,
-                  speed: newSpeed,
-                  is_being_attacked: true,
-                  last_attack_time: new Date().toISOString(),
-                })
-                .eq("player_id", playerId)
-                .then(() => {
-                  handleZombieAttack(playerId, newHealth, newSpeed);
-                });
-
-              return {
-                ...prev,
-                [playerId]: {
-                  ...currentState,
-                  countdown: undefined,
-                },
-              };
-            } else if (currentState.speed > 30) {
-              // Cancel countdown if speed increases above 30
-              clearInterval(countdownInterval);
-              return {
-                ...prev,
-                [playerId]: {
-                  ...currentState,
-                  countdown: undefined,
-                },
-              };
-            }
-
-            return {
-              ...prev,
-              [playerId]: {
-                ...currentState,
-                countdown: newCountdown,
-              },
-            };
-          });
-        }, 1000);
       }
-    });
-  }, [playerStates, zombieState.isAttacking, handleZombieAttack, players]);
 
-  // Fetch game room and players data
+      setPlayerStates((prev) => {
+        const updatedStates = { ...prev };
+        let attackTriggered = false;
+
+        attackQueue.forEach((queuedPlayerId) => {
+          const currentState = updatedStates[queuedPlayerId];
+          if (!currentState || currentState.countdown === undefined) return;
+
+          const newCountdown = currentState.countdown - 1;
+          console.log(`⏲️ Countdown untuk ${queuedPlayerId}: ${newCountdown}s`);
+
+          if (newCountdown <= 0 && currentState.speed <= 30 && !zombieState.isAttacking && attackQueue[0] === queuedPlayerId && !attackTriggered) {
+            const newHealth = Math.max(0, currentState.health - 1);
+            const newSpeed = currentState.speed;
+
+            console.log(`🧟 Memulai serangan pada ${queuedPlayerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
+            supabase
+              .from("player_health_states")
+              .update({
+                health: newHealth,
+                speed: newSpeed,
+                is_being_attacked: true,
+                last_attack_time: new Date().toISOString(),
+              })
+              .eq("player_id", queuedPlayerId)
+              .eq("room_id", gameRoom.id)
+              .then(({ error }) => {
+                if (error) {
+                  console.error(`⚠️ Gagal memperbarui status kesehatan untuk ${queuedPlayerId}:`, error);
+                  setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
+                  return;
+                }
+                handleZombieAttack(queuedPlayerId, newHealth, newSpeed);
+                attackTriggered = true;
+                setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
+              });
+
+            updatedStates[queuedPlayerId] = {
+              ...currentState,
+              countdown: undefined,
+            };
+          } else if (currentState.speed > 30 || currentState.health <= 0) {
+            console.log(`🚀 Kecepatan ${queuedPlayerId} meningkat ke ${currentState.speed} atau nyawa habis, membatalkan countdown`);
+            setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
+            updatedStates[queuedPlayerId] = {
+              ...currentState,
+              countdown: undefined,
+            };
+          } else {
+            updatedStates[queuedPlayerId] = {
+              ...currentState,
+              countdown: newCountdown,
+            };
+          }
+        });
+
+        return updatedStates;
+      });
+    }
+
+    if (eligiblePlayers.length === 0 && attackQueue.length === 0 && !zombieState.isAttacking) {
+      setZombieState({
+        isAttacking: false,
+        targetPlayerId: null,
+        attackProgress: 0,
+        basePosition: 500,
+        currentPosition: 500,
+      });
+      console.log("🧟 Tidak ada pemain dengan kecepatan <= 30, zombie direset");
+    }
+  }, [playerStates, zombieState.isAttacking, handleZombieAttack, players, attackQueue, recentAttacks, gameRoom]);
+
+  const checkInactivityPenalty = useCallback(() => {
+    if (!gameRoom) {
+      console.log("⚠️ gameRoom kosong, lewati pemeriksaan penalti ketidakaktifan");
+      return;
+    }
+    supabase
+      .from("player_health_states")
+      .select("player_id, last_answer_time, speed")
+      .eq("room_id", gameRoom.id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Gagal memeriksa ketidakaktifan:", error);
+          return;
+        }
+        data.forEach(async (state) => {
+          const lastAnswerTime = new Date(state.last_answer_time).getTime();
+          const currentTime = Date.now();
+          const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
+          if (timeSinceLastAnswer >= 10 && state.speed > 20) {
+            const newSpeed = Math.max(20, state.speed - 10);
+            console.log(`⚠️ Pemain ${state.player_id} tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi ke ${newSpeed}`);
+            await supabase
+              .from("player_health_states")
+              .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
+              .eq("player_id", state.player_id)
+              .eq("room_id", gameRoom.id);
+            setPlayerStates((prev) => ({
+              ...prev,
+              [state.player_id]: {
+                ...prev[state.player_id],
+                speed: newSpeed,
+                countdown: newSpeed <= 30 && !prev[state.player_id].isBeingAttacked && prev[state.player_id].health > 0 ? 6 : prev[state.player_id].countdown,
+              },
+            }));
+          }
+        });
+      });
+  }, [gameRoom]);
+
   const fetchGameData = useCallback(async () => {
     try {
       const { data: room, error: roomError } = await supabase
@@ -373,6 +587,12 @@ export default function HostGamePage() {
 
       if (roomError) throw roomError;
       setGameRoom(room);
+
+      if (room.current_phase === "completed") {
+        console.log("🏁 Fase permainan selesai, mengalihkan ke hasil");
+        router.push(`/game/${roomCode}/results`);
+        return;
+      }
 
       const { data: playersData, error: playersError } = await supabase
         .from("players")
@@ -408,20 +628,41 @@ export default function HostGamePage() {
       if (playersData && playersData.length > 0) {
         initializePlayerStates(playersData, healthData || []);
       }
+
+      if (playersData && completionData && playersData.length === completionData.length) {
+        await supabase
+          .from("game_rooms")
+          .update({ current_phase: "completed" })
+          .eq("id", room.id);
+        console.log("🏁 Semua pemain selesai, memperbarui current_phase ke completed");
+        router.push(`/game/${roomCode}/results`);
+      }
     } catch (error) {
       console.error("Gagal mengambil data permainan:", error);
     } finally {
       setIsLoading(false);
     }
-  }, [roomCode, initializePlayerStates]);
+  }, [roomCode, initializePlayerStates, router]);
 
-  // Realtime subscriptions
   useEffect(() => {
     if (!gameRoom) return;
 
     console.log(`🔗 Menyiapkan langganan real-time untuk ruangan ${gameRoom.id}`);
     const roomChannel = supabase
       .channel(`room-${gameRoom.id}-all`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "game_rooms", filter: `id=eq.${gameRoom.id}` },
+        (payload) => {
+          console.log("🏷️ Perubahan game_rooms terdeteksi:", payload);
+          const newRoom = payload.new as GameRoom;
+          if (newRoom.current_phase === "completed") {
+            console.log("🏁 Fase permainan selesai, mengalihkan ke hasil");
+            router.push(`/game/${roomCode}/results`);
+          }
+          setGameRoom(newRoom);
+        }
+      )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "players", filter: `room_id=eq.${gameRoom.id}` },
@@ -432,29 +673,45 @@ export default function HostGamePage() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "player_health_states", filter: `room_id=eq.${gameRoom.id}` },
+        { event: "UPDATE", schema: "public", table: "player_health_states", filter: `room_id=eq.${gameRoom.id}` },
         (payload) => {
           console.log("💖 Perubahan status kesehatan terdeteksi:", payload);
           const healthState = payload.new as PlayerHealthState;
           if (healthState) {
+            console.log(`🔄 Memperbarui status untuk ${healthState.player_id}:`, {
+              health: healthState.health,
+              speed: healthState.speed,
+              isBeingAttacked: healthState.is_being_attacked,
+            });
             setPlayerHealthStates((prev) => ({
               ...prev,
               [healthState.player_id]: healthState,
             }));
-            setPlayerStates((prev) => ({
-              ...prev,
-              [healthState.player_id]: {
-                ...prev[healthState.player_id],
+            setPlayerStates((prev) => {
+              const existingState = prev[healthState.player_id] || {};
+              const newState = {
+                ...existingState,
                 health: healthState.health,
                 speed: healthState.speed,
                 isBeingAttacked: healthState.is_being_attacked,
                 lastAttackTime: new Date(healthState.last_attack_time).getTime(),
-                countdown: healthState.speed <= 30 && !healthState.is_being_attacked ? 6 : undefined,
-              },
-            }));
+                countdown: healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 6 : undefined,
+              };
+              return {
+                ...prev,
+                [healthState.player_id]: newState,
+              };
+            });
 
-            if (healthState.is_being_attacked && !zombieState.isAttacking) {
-              handleZombieAttack(healthState.player_id, healthState.health, healthState.speed);
+            // Trigger attack if not already attacking and speed is low
+            if (healthState.speed <= 30 && !healthState.is_being_attacked && !zombieState.isAttacking && healthState.health > 0) {
+              console.log(`🧟 Memulai countdown serangan dari Supabase untuk ${healthState.player_id}`);
+              setAttackQueue((prev) => {
+                if (!prev.includes(healthState.player_id)) {
+                  return [...prev, healthState.player_id];
+                }
+                return prev;
+              });
             }
           }
         }
@@ -493,6 +750,27 @@ export default function HostGamePage() {
               setShowCompletionPopup(true);
             }
           }
+          supabase
+            .from("game_completions")
+            .select("*")
+            .eq("room_id", gameRoom.id)
+            .then(({ data, error }) => {
+              if (error) {
+                console.error("Gagal memeriksa penyelesaian:", error);
+                return;
+              }
+              if (data.length === players.length) {
+                supabase
+                  .from("game_rooms")
+                  .update({ current_phase: "completed" })
+                  .eq("id", gameRoom.id)
+                  .then(({ error }) => {
+                    if (error) console.error("Gagal memperbarui current_phase:", error);
+                    else console.log("🏁 Semua pemain selesai, memperbarui current_phase ke completed");
+                    router.push(`/game/${roomCode}/results`);
+                  });
+              }
+            });
         }
       )
       .subscribe();
@@ -501,9 +779,8 @@ export default function HostGamePage() {
       console.log("🔌 Membersihkan langganan real-time");
       supabase.removeChannel(roomChannel);
     };
-  }, [gameRoom, handleZombieAttack, handleCorrectAnswer, fetchGameData, players, zombieState.isAttacking]);
+  }, [gameRoom, handleZombieAttack, handleCorrectAnswer, fetchGameData, players, zombieState.isAttacking, router, roomCode]);
 
-  // Initial data fetch
   useEffect(() => {
     if (roomCode) {
       console.log(`🎮 Menginisialisasi halaman host untuk ruangan: ${roomCode}`);
@@ -511,16 +788,16 @@ export default function HostGamePage() {
     }
   }, [roomCode, fetchGameData]);
 
-  // Check low speed players every second
   useEffect(() => {
+    if (!gameRoom) return;
     const interval = setInterval(() => {
       checkLowSpeedPlayers();
+      checkInactivityPenalty();
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [checkLowSpeedPlayers]);
+  }, [checkLowSpeedPlayers, checkInactivityPenalty, gameRoom]);
 
-  // Test image loading
   useEffect(() => {
     const testAllImages = async () => {
       const status: { [key: string]: boolean } = {};
@@ -554,7 +831,6 @@ export default function HostGamePage() {
     });
   };
 
-  // Handle client-side hydration and resize
   useEffect(() => {
     setIsClient(true);
     setScreenWidth(window.innerWidth);
@@ -563,7 +839,6 @@ export default function HostGamePage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Animation timer
   useEffect(() => {
     const interval = setInterval(
       () => setAnimationTime((prev) => prev + 1),
@@ -572,14 +847,12 @@ export default function HostGamePage() {
     return () => clearInterval(interval);
   }, [gameMode]);
 
-  // Helper for seamless looping
   const getLoopPosition = (speed: number, spacing: number, offset = 0) => {
     const totalDistance = screenWidth + spacing;
     const position = (animationTime * speed + offset) % totalDistance;
     return position > 0 ? position - spacing : totalDistance + position - spacing;
   };
 
-  // Get working image path
   const getWorkingImagePath = (character: (typeof characterGifs)[0]) => {
     if (imageLoadStatus[character.src]) return character.src;
     if (imageLoadStatus[character.fallback]) return character.fallback;
@@ -606,28 +879,29 @@ export default function HostGamePage() {
         }px)`,
       }}
     >
-      {/* Countdown Display */}
       <AnimatePresence>
-        {Object.entries(playerStates).map(([playerId, state]) => {
-          if (state.countdown !== undefined && state.countdown > 0) {
-            const player = players.find((p) => p.id === playerId);
-            if (!player) return null;
-            return (
-              <motion.div
-                key={`countdown-${playerId}`}
-                initial={{ opacity: 0, y: -50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -50 }}
-                className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50"
-              >
-                <div className="bg-red-800/90 text-white font-mono text-lg px-4 py-2 rounded border border-red-500 shadow-lg animate-pulse">
-                  {player.nickname} akan diserang dalam {state.countdown} detik! Tingkatkan kecepatan!
-                </div>
-              </motion.div>
-            );
-          }
-          return null;
-        })}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 max-w-[240px] max-h-[400px] overflow-y-auto">
+          {Object.entries(playerStates)
+            .filter(([_, state]) => state.countdown !== undefined && state.countdown > 0)
+            .slice(0, 10)
+            .map(([playerId, state]) => {
+              const player = players.find((p) => p.id === playerId);
+              if (!player) return null;
+              return (
+                <motion.div
+                  key={`countdown-${playerId}`}
+                  initial={{ opacity: 0, y: -20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="flex items-center bg-red-900/90 text-white font-mono text-sm px-3 py-2 rounded-lg shadow-lg border border-red-500/50 w-[240px] animate-pulse"
+                >
+                  <span className="flex-1 truncate">{player.nickname}</span>
+                  <span className="ml-2 font-bold text-yellow-300">{state.countdown}s</span>
+                </motion.div>
+              );
+            })}
+        </div>
       </AnimatePresence>
 
       <GameBackground
@@ -678,57 +952,61 @@ export default function HostGamePage() {
         zombieState={zombieState}
         playerHealthStates={playerHealthStates}
       />
-      {/* Completion Popup */}
-      <AnimatePresence>
-        {showCompletionPopup && completedPlayers.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-            onClick={() => setShowCompletionPopup(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 50 }}
-              className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-2xl font-bold text-white font-mono mb-4">
-                Selamat Anda Lolos dari Kejaran!
-              </h2>
-              <div className="flex justify-center gap-4 mb-6">
-                {completedPlayers.map((player) => {
-                  const character = getCharacterByType(player.character_type);
-                  return (
-                    <img
-                      key={player.id}
-                      src={getWorkingImagePath(character)}
-                      alt={character.alt}
-                      className="w-16 h-16 object-contain"
-                    />
-                  );
-                })}
-              </div>
-              <div className="text-white font-mono mb-6">
-                <p className="text-lg mb-2">Pemain yang Lolos:</p>
-                <ul className="list-disc list-inside">
-                  {completedPlayers.map((player) => (
-                    <li key={player.id}>{player.nickname}</li>
-                  ))}
-                </ul>
-              </div>
-              <button
-                onClick={() => setShowCompletionPopup(false)}
-                className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
-              >
-                Tutup
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+<AnimatePresence>
+  {showCompletionPopup && completedPlayers.length > 0 && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      onClick={() => setShowCompletionPopup(false)}
+    >
+      <motion.div
+        initial={{ scale: 0.8, y: 50 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.8, y: 50 }}
+        className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-2xl font-bold text-white font-mono mb-4">
+          Selamat Anda Lolos dari Kejaran!
+        </h2>
+        <div className="flex justify-center gap-4 mb-6">
+          {completedPlayers.map((player) => {
+            const character = getCharacterByType(player.character_type);
+            return (
+              <img
+                key={player.id}
+                src={getWorkingImagePath(character)}
+                alt={character.alt}
+                className="w-16 h-16 object-contain"
+              />
+            );
+          })}
+        </div>
+        <div className="text-white font-mono mb-6">
+          <p className="text-lg mb-2">Pemain yang Lolos:</p>
+          <ul className="list-disc list-inside">
+            {completedPlayers.map((player) => (
+              <li key={player.id}>{player.nickname}</li>
+            ))}
+          </ul>
+        </div>
+        <button
+          onClick={() => {
+            setShowCompletionPopup(false);
+            router.push(`/game/${roomCode}/results`);
+          }}
+          className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
+        >
+          Lihat Hasil
+        </button>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
     </div>
   );
 }
