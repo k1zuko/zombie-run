@@ -135,7 +135,8 @@ export default function PlayersPanel({
               <div className="flex items-center gap-1 text-red-300/80 text-[11px]">
                 <Users className="w-3 h-3" />
                 <span className="font-mono">
-                  {players.filter(p => p.is_alive).length}<span className="text-red-500/70">/</span>{gameRoom?.max_players || 40}
+                  {players.filter(p => p.is_alive && (playerStates[p.id]?.health ?? playerHealthStates[p.id]?.health ?? 3) > 0).length}
+                  <span className="text-red-500/70">/</span>{gameRoom?.max_players || 40}
                 </span>
               </div>
             </div>
@@ -172,176 +173,165 @@ export default function PlayersPanel({
             </div>
           ) : (
             <div className="space-y-1 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-red-900/50 relative z-10">
-              {players.map((player, index) => {
-                const character = getCharacterByType(player.character_type)
-                const workingPath = getWorkingImagePath(character)
-                const playerState = playerStates[player.id]
-                const healthState = playerHealthStates[player.id]
-                const isBeingAttacked = playerState?.isBeingAttacked || false
-                const health = playerState?.health ?? healthState?.health ?? 3
-                const isRecentAttack = recentAttacks.has(player.id)
-                const isZombieTarget = zombieState.targetPlayerId === player.id
-                const isSynced = healthState?.synced ?? false
-                const isConnected = player.is_connected ?? true
-                const isAlive = health > 0
-                const attackIntensity = playerState?.attackIntensity || 0
+              {players
+                .filter((player) => {
+                  const playerState = playerStates[player.id];
+                  const healthState = playerHealthStates[player.id];
+                  const health = playerState?.health ?? healthState?.health ?? 3;
+                  return player.is_alive && health > 0;
+                })
+                .map((player, index) => {
+                  const character = getCharacterByType(player.character_type)
+                  const workingPath = getWorkingImagePath(character)
+                  const playerState = playerStates[player.id]
+                  const healthState = playerHealthStates[player.id]
+                  const isBeingAttacked = playerState?.isBeingAttacked || false
+                  const health = playerState?.health ?? healthState?.health ?? 3
+                  const isRecentAttack = recentAttacks.has(player.id)
+                  const isZombieTarget = zombieState.targetPlayerId === player.id
+                  const isSynced = healthState?.synced ?? false
+                  const isConnected = player.is_connected ?? true
+                  const attackIntensity = playerState?.attackIntensity || 0
 
-                // Blood drips for this player
-                const playerBloodDrips = bloodDrips.filter(d => d.playerId === player.id)
+                  // Blood drips for this player
+                  const playerBloodDrips = bloodDrips.filter(d => d.playerId === player.id)
 
-                return (
-                  <div
-                    key={player.id}
-                    className={`
-                      relative flex items-center gap-1.5 p-1.5 rounded-sm transition-all duration-150
-                      ${
-                        isZombieTarget
-                          ? "bg-gradient-to-r from-red-900/70 via-red-900/50 to-red-900/30 border-l-2 border-red-500"
-                          : isBeingAttacked
-                            ? "bg-red-900/40 border-l-2 border-red-600"
-                            : !isAlive
-                              ? "bg-black/40 border-l-2 border-gray-800 hover:bg-gray-900/30"
+                  return (
+                    <div
+                      key={player.id}
+                      className={`
+                        relative flex items-center gap-1.5 p-1.5 rounded-sm transition-all duration-150
+                        ${
+                          isZombieTarget
+                            ? "bg-gradient-to-r from-red-900/70 via-red-900/50 to-red-900/30 border-l-2 border-red-500"
+                            : isBeingAttacked
+                              ? "bg-red-900/40 border-l-2 border-red-600"
                               : isRecentAttack
                                 ? "bg-red-800/30 border-l-2 border-red-800"
                                 : "bg-red-900/10 hover:bg-red-900/20 border-l-2 border-red-900/20"
-                      }
-                      ${isBeingAttacked ? 'animate-attack-shake' : ''}
-                    `}
-                  >
-                    {/* Blood drips */}
-                    {playerBloodDrips.map(drip => (
-                      <div 
-                        key={drip.id}
-                        className="absolute w-1 h-3 bg-red-900/80 rounded-full animate-blood-drip pointer-events-none"
-                        style={{
-                          top: `${drip.top}px`,
-                          left: `${drip.left}px`,
-                          animationDuration: `${1 + Math.random()}s`
-                        }}
-                      ></div>
-                    ))}
+                        }
+                        ${isBeingAttacked ? 'animate-attack-shake' : ''}
+                      `}
+                    >
+                      {/* Blood drips */}
+                      {playerBloodDrips.map(drip => (
+                        <div 
+                          key={drip.id}
+                          className="absolute w-1 h-3 bg-red-900/80 rounded-full animate-blood-drip pointer-events-none"
+                          style={{
+                            top: `${drip.top}px`,
+                            left: `${drip.left}px`,
+                            animationDuration: `${1 + Math.random()}s`
+                          }}
+                        ></div>
+                      ))}
 
-                    {/* Player avatar with status indicators */}
-                    <div className="relative flex-shrink-0">
-                      <div
-                        className={`
-                          w-8 h-8 rounded-full border-2 transition-all duration-150
-                          ${
-                            isConnected 
-                              ? isSynced 
-                                ? "border-green-500/80" 
-                                : "border-yellow-500/80"
-                              : "border-red-500/80"
-                          }
-                          ${
-                            isZombieTarget
-                              ? "shadow-md shadow-red-600/50 ring-2 ring-red-500/50"
-                              : isBeingAttacked
-                                ? "shadow-sm shadow-red-500/30"
-                                : ""
-                          }
-                        `}
-                        style={{
-                          backgroundImage: `url(${workingPath})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          imageRendering: "pixelated",
-                          filter: !isAlive 
-                            ? "grayscale(100%) brightness(0.3) contrast(1.2)" 
-                            : isBeingAttacked 
+                      {/* Player avatar with status indicators */}
+                      <div className="relative flex-shrink-0">
+                        <div
+                          className={`
+                            w-8 h-8 rounded-full border-2 transition-all duration-150
+                            ${
+                              isConnected 
+                                ? isSynced 
+                                  ? "border-green-500/80" 
+                                  : "border-yellow-500/80"
+                                : "border-red-500/80"
+                            }
+                            ${
+                              isZombieTarget
+                                ? "shadow-md shadow-red-600/50 ring-2 ring-red-500/50"
+                                : isBeingAttacked
+                                  ? "shadow-sm shadow-red-500/30"
+                                  : ""
+                            }
+                          `}
+                          style={{
+                            backgroundImage: `url(${workingPath})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            imageRendering: "pixelated",
+                            filter: isBeingAttacked 
                               ? `brightness(${1.1 + attackIntensity/10}) contrast(1.2)` 
                               : "none",
-                          transform: isBeingAttacked ? `scale(${1 + attackIntensity/20})` : 'scale(1)'
-                        }}
-                      />
-                      
-                      {/* Status indicators */}
-                      {isZombieTarget && (
-                        <>
-                          <div className="absolute inset-0 bg-red-600/40 rounded-full animate-ping" />
-                          <Crosshair className="absolute -top-1 -right-1 w-3 h-3 text-red-500 animate-pulse" />
-                        </>
-                      )}
-                      {!isConnected && (
-                        <RadioTower className="absolute -top-1 -right-1 w-3 h-3 text-red-500/80 animate-pulse" />
-                      )}
-                    </div>
+                            transform: isBeingAttacked ? `scale(${1 + attackIntensity/20})` : 'scale(1)'
+                          }}
+                        />
+                        
+                        {/* Status indicators */}
+                        {isZombieTarget && (
+                          <>
+                            <div className="absolute inset-0 bg-red-600/40 rounded-full animate-ping" />
+                            <Crosshair className="absolute -top-1 -right-1 w-3 h-3 text-red-500 animate-pulse" />
+                          </>
+                        )}
+                        {!isConnected && (
+                          <RadioTower className="absolute -top-1 -right-1 w-3 h-3 text-red-500/80 animate-pulse" />
+                        )}
+                      </div>
 
-                    {/* Player info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <p
-                          className={`
-                            text-[11px] font-medium truncate
-                            ${
-                              !isAlive 
-                                ? "text-gray-500 line-through" 
-                                : isBeingAttacked 
+                      {/* Player info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <p
+                            className={`
+                              text-[11px] font-medium truncate
+                              ${
+                                isBeingAttacked 
                                   ? "text-red-300 font-bold" 
                                   : "text-red-100"
-                            }
-                            ${isBeingAttacked ? 'tracking-wider' : ''}
-                          `}
-                        >
-                          {player.nickname}
-                        </p>
-                        {isZombieTarget && (
-                          <AlertTriangle className="w-2.5 h-2.5 text-red-500 animate-pulse flex-shrink-0" />
-                        )}
-                        {isBeingAttacked && (
-                          <Zap className="w-2.5 h-2.5 text-red-400 animate-pulse flex-shrink-0" />
-                        )}
-                      </div>
+                              }
+                              ${isBeingAttacked ? 'tracking-wider' : ''}
+                            `}
+                          >
+                            {player.nickname}
+                          </p>
+                          {isZombieTarget && (
+                            <AlertTriangle className="w-2.5 h-2.5 text-red-500 animate-pulse flex-shrink-0" />
+                          )}
+                          {isBeingAttacked && (
+                            <Zap className="w-2.5 h-2.5 text-red-400 animate-pulse flex-shrink-0" />
+                          )}
+                        </div>
 
-                      {/* Health bar and score */}
-                      <div className="flex items-center justify-between mt-0.5">
-                        <div className="flex items-center gap-0.5">
-                          {[...Array(3)].map((_, heartIndex) => (
-                            <Heart
-                              key={heartIndex}
-                              className={`w-2.5 h-2.5 transition-all ${
-                                heartIndex < health 
-                                  ? "text-red-600 fill-red-600" 
-                                  : "text-red-900/70 fill-red-900/40"
-                              } ${
-                                isBeingAttacked && heartIndex < health ? 'animate-heartbeat' : ''
-                              }`}
-                              style={{animationDelay: `${heartIndex * 0.1}s`}}
-                            />
-                          ))}
-                          <span className={`text-[9px] ml-0.5 font-mono ${
-                            health > 1 ? "text-red-300/90" : "text-red-700 font-bold"
-                          }`}>
-                            {health}/3
+                        {/* Health bar and score */}
+                        <div className="flex items-center justify-between mt-0.5">
+                          <div className="flex items-center gap-0.5">
+                            {[...Array(3)].map((_, heartIndex) => (
+                              <Heart
+                                key={heartIndex}
+                                className={`w-2.5 h-2.5 transition-all ${
+                                  heartIndex < health 
+                                    ? "text-red-600 fill-red-600" 
+                                    : "text-red-900/70 fill-red-900/40"
+                                } ${
+                                  isBeingAttacked && heartIndex < health ? 'animate-heartbeat' : ''
+                                }`}
+                                style={{animationDelay: `${heartIndex * 0.1}s`}}
+                              />
+                            ))}
+                            <span className={`text-[9px] ml-0.5 font-mono ${
+                              health > 1 ? "text-red-300/90" : "text-red-700 font-bold"
+                            }`}>
+                              {health}/3
+                            </span>
+                          </div>
+                          <span className="text-[9px] text-red-400/80 font-mono">
+                            <span className="text-red-300">{player.score}</span> XP
                           </span>
                         </div>
-                        <span className="text-[9px] text-red-400/80 font-mono">
-                          <span className="text-red-300">{player.score}</span> XP
-                        </span>
                       </div>
-                    </div>
 
-                    {/* Player position number */}
-                    <div className={`
-                      text-[9px] font-bold ml-auto px-1 py-0.5 rounded
-                      ${
-                        !isAlive 
-                          ? "text-red-900/60 bg-black/20" 
-                          : "text-red-100/90 bg-red-900/30"
-                      }
-                    `}>
-                      #{index + 1}
-                    </div>
-                    
-                    {/* Death overlay */}
-                    {!isAlive && (
-                      <div className="absolute inset-0 bg-black/50 rounded-sm flex items-center justify-center pointer-events-none">
-                        <Skull className="w-4 h-4 text-red-900/80 animate-pulse" />
+                      {/* Player position number */}
+                      <div className={`
+                        text-[9px] font-bold ml-auto px-1 py-0.5 rounded
+                        text-red-100/90 bg-red-900/30
+                      `}>
+                        #{index + 1}
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    </div>
+                  )
+                })}
             </div>
           )}
         </CardContent>
