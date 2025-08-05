@@ -198,42 +198,46 @@ export default function HostPage() {
       // Fetch and randomize questions from quiz_questions
       const { data: questions, error: quizError } = await supabase
         .from("quiz_questions")
-        .select("id, question_type, question_content, answers, correct_answer")
-        .eq("room_id", room.id)
-        .order("id", { ascending: true })
+        .select("id, question_type, question_text, image_url, options, correct_answer");
 
       if (quizError || !questions || questions.length === 0) {
-        throw new Error(`Gagal mengambil soal: ${quizError?.message || "Tidak ada soal ditemukan"}`)
+        throw new Error(`Gagal mengambil soal: ${quizError?.message || "Bank soal kosong"}`);
       }
 
+
       // Randomize questions and select based on question_count
-      const questionCount = parseInt(questionCount)
+      const selectedQuestionCount = parseInt(questionCount);
+
       const shuffledQuestions = questions
         .map((value) => ({ value, sort: Math.random() }))
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value)
-        .slice(0, Math.min(questionCount, questions.length))
+        .slice(0, Math.min(selectedQuestionCount, questions.length));
+
 
       const formattedQuestions = shuffledQuestions.map((q, index) => ({
         id: q.id,
         question_index: index + 1,
-        question_type: q.question_type,
-        question_content: q.question_content,
-        answers: q.answers,
-        correct_answer: q.correct_answer,
-      }))
+        question_type: q.question_type, // 'TEXT' atau 'IMAGE'
+        question_text: q.question_text, // Teks pertanyaan
+        image_url: q.image_url,         // URL gambar (bisa null)
+        options: q.options,             // Array pilihan jawaban
+        correct_answer: q.correct_answer, // Jawaban benar
+      }));
 
-      // Update game_rooms with randomized questions
+
+      // Update game_rooms with randomized questions and game settings
       const { error: roomError } = await supabase
         .from("game_rooms")
         .update({
           status: "playing",
           current_phase: "quiz",
-          questions: formattedQuestions,
+          questions: formattedQuestions, // Simpan soal yang sudah diformat
           duration: parseInt(gameDuration),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", room.id)
+        .eq("id", room.id);
+
 
       if (roomError) {
         throw new Error(`Gagal memulai game: ${roomError.message}`)
@@ -301,7 +305,7 @@ export default function HostPage() {
         <div className="max-w-6xl mx-auto">
           <motion.div initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
             <h1 className="text-4xl md:text-6xl font-black mb-4 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              Kuis Anak Ceria
+              Zombie Run
             </h1>
 
             {countdown !== null && (
