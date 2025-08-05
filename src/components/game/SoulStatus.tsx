@@ -227,7 +227,7 @@ export default function SoulStatus({
                 </p>
                 {isCurrentPlayer && (
                   <span className="text-xs bg-red-800 text-white px-2 py-1 rounded font-mono font-bold tracking-wider">
-                    YOUR SOUL
+                    Saya
                   </span>
                 )}
               </div>
@@ -252,7 +252,7 @@ export default function SoulStatus({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-red-900 font-mono font-bold tracking-wider">
-                LIFE ESSENCE
+                Jiwa
               </span>
               <span className={cn(
                 "text-sm font-mono font-bold tracking-wider",
@@ -295,7 +295,7 @@ export default function SoulStatus({
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-red-900/50">
+          {/* <div className="grid grid-cols-2 gap-4 pt-2 border-t border-red-900/50">
             <div className="text-center">
               <div className="text-lg font-bold text-white font-mono tracking-wider">
                 {player.score || 0}
@@ -318,7 +318,7 @@ export default function SoulStatus({
                 {player.hasAnswered ? "HUNGERING" : isDead ? "CONSUMED" : "WAITING"}
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Power-ups */}
           {player.powerUps && player.powerUps.length > 0 && (

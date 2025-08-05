@@ -111,9 +111,9 @@ export default function HomePage() {
                 Zombie Run
               </h1>
               <motion.div
-                animate={{ rotate: 360 }}
+                animate={{ rotate: -360 }}
                 transition={{ duration: 20, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                className="mr-4"
+                className="ml-4"
               >
                 <Gamepad2 className="w-16 h-16 text-white" />
               </motion.div>
@@ -140,9 +140,9 @@ export default function HomePage() {
 
             {/* Join Game Card */}
             <motion.div
-              initial={{ opacity: 0, x: 50 }}
+              initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.8 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
               whileHover={{ scale: 1.02 }}
               className="group"
             >
@@ -166,7 +166,7 @@ export default function HomePage() {
                         placeholder="Masukkan kode game"
                         value={gameCode}
                         onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 text-center text-xl font-mono h-14 rounded-xl focus:border-white/40 focus:ring-white/20"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 text-center text-xl font-mono h-12 rounded-xl focus:border-white/40 focus:ring-white/20"
                         maxLength={6}
                       />
                     </div>
@@ -175,7 +175,7 @@ export default function HomePage() {
                         placeholder="Nama kamu"
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
-                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 h-12 rounded-xl focus:border-white/40 focus:ring-white/20"
+                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 text-center text-xl font-mono h-12 rounded-xl focus:border-white/40 focus:ring-white/20"
                         maxLength={20}
                       />
                     </div>
@@ -183,7 +183,7 @@ export default function HomePage() {
                   <Button
                     onClick={handleJoinGame}
                     disabled={!gameCode || !nickname || isJoining}
-                    className="w-full bg-black border-2 border-white text-white hover:bg-white hover:text-black font-bold py-4 text-lg rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-black border-2 border-white text-white hover:bg-white hover:text-black font-bold py-4 text-lg rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     {isJoining ? (
                       <motion.div
@@ -203,7 +203,7 @@ export default function HomePage() {
             </motion.div>
           {/* Host Game Card */}
           <motion.div
-            initial={{ opacity: 0, x: -50 }}
+            initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
             whileHover={{ scale: 1.02 }}
@@ -226,7 +226,7 @@ export default function HomePage() {
                 <Button
                   onClick={handleHostGame}
                   disabled={isCreating}
-                  className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50"
+                  className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50 cursor-pointer"
                 >
                   {isCreating ? (
                     <motion.div
