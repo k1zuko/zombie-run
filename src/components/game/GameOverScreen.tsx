@@ -504,11 +504,14 @@ export default function GameOverScreen() {
       return `${activity.player_nickname} Finished... (${correct_answers}/${playerData?.total || 10} correct, ${final_health} HP)`
     }
     if (activity.activity_type === "attack") {
-      const { attack_type, attack_data, damage } = activity.activity_data
+      const { attack_type, attack_data, damage } = activity.activity_data;
       if (attack_type === "wrong_answer") {
-        return `${activity.player_nickname} was attacked by zombies for a wrong answer on question ${attack_data?.question_index! + 1}! (-${damage} HP)`
+        const questionIndex = attack_data?.question_index ?? -1;
+        const questionMessage = questionIndex !== -1 ? ` on question ${questionIndex + 1}` : "";
+
+        return `${activity.player_nickname} was attacked by zombies for a wrong answer${questionMessage}! (-${damage} HP)`;
       }
-      return `${activity.player_nickname} suffered a ${attack_type} attack! (-${damage} HP)`
+      return `${activity.player_nickname} suffered a ${attack_type} attack! (-${damage} HP)`;
     }
     return `${activity.player_nickname} WAS ATTACKED`
   }
