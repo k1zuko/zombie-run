@@ -1,5 +1,6 @@
 
 "use client";
+
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +12,7 @@ import RunningCharacters from "@/components/game/host/RunningCharacters";
 import GameUI from "@/components/game/host/GameUI";
 import BackgroundEffects from "@/components/game/host/BackgroundEffects";
 
+// Interfaces tetap sama seperti kode asli
 interface Player {
   id: string;
   nickname: string;
@@ -44,6 +46,7 @@ interface PlayerHealthState {
 interface PlayerState {
   id: string;
   health: number;
+  maxHealth: number;
   speed: number;
   isBeingAttacked: boolean;
   position: number;
@@ -77,7 +80,7 @@ const characterGifs = [
     src: "/images/character.gif",
     fallback: "/character/character.gif",
     rootFallback: "/character.gif",
-    alt: "Green Character",
+    alt: "Karakter Hijau",
     color: "bg-green-500",
     type: "robot1",
   },
@@ -85,7 +88,7 @@ const characterGifs = [
     src: "/images/character1.gif",
     fallback: "/character/character1.gif",
     rootFallback: "/character1.gif",
-    alt: "Blue Character",
+    alt: "Karakter Biru",
     color: "bg-blue-500",
     type: "robot2",
   },
@@ -93,7 +96,7 @@ const characterGifs = [
     src: "/images/character2.gif",
     fallback: "/character/character2.gif",
     rootFallback: "/character2.gif",
-    alt: "Red Character",
+    alt: "Karakter Merah",
     color: "bg-red-500",
     type: "robot3",
   },
@@ -101,7 +104,7 @@ const characterGifs = [
     src: "/images/character3.gif",
     fallback: "/character/character3.gif",
     rootFallback: "/character3.gif",
-    alt: "Purple Character",
+    alt: "Karakter Ungu",
     color: "bg-purple-500",
     type: "robot4",
   },
@@ -109,7 +112,7 @@ const characterGifs = [
     src: "/images/character4.gif",
     fallback: "/character/character4.gif",
     rootFallback: "/character4.gif",
-    alt: "Orange Character",
+    alt: "Karakter Oranye",
     color: "bg-orange-500",
     type: "robot5",
   },
@@ -141,7 +144,8 @@ export default function HostGamePage() {
   });
   const [attackQueue, setAttackQueue] = useState<string[]>([]);
   const [recentAttacks, setRecentAttacks] = useState<Set<string>>(new Set());
-  const [backgroundFlash, setBackgroundFlash] = useState(false);
+  const [backgroundFlash, setBackgroundFlash] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
   const attackIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const getCharacterByType = (type: string) => {
@@ -155,19 +159,21 @@ export default function HostGamePage() {
     playersData.forEach((player, index) => {
       const healthState = healthData.find((h) => h.player_id === player.id);
       const currentHealth = healthState?.health ?? 3;
-      const currentSpeed = healthState?.speed ?? 20; // Default speed to 20 if undefined
+      const currentMaxHealth = healthState?.max_health ?? 3;
+      const currentSpeed = healthState?.speed ?? 20;
       const isBeingAttacked = healthState?.is_being_attacked ?? false;
       const lastAttackTime = healthState ? new Date(healthState.last_attack_time).getTime() : 0;
 
       newStates[player.id] = {
         id: player.id,
         health: currentHealth,
+        maxHealth: currentMaxHealth,
         speed: currentSpeed,
         isBeingAttacked,
         position: index,
         lastAttackTime,
         attackIntensity: 0,
-        countdown: currentSpeed <= 30 && !isBeingAttacked ? 6 : undefined,
+        countdown: currentSpeed <= 30 && !isBeingAttacked && currentHealth > 0 && player.is_alive ? 5 : undefined,
       };
 
       if (healthState) {
@@ -180,17 +186,18 @@ export default function HostGamePage() {
   }, []);
 
   const handleZombieAttack = useCallback((playerId: string, newHealth: number, newSpeed: number) => {
-    console.log(`🧟 Mulai serangan pada pemain ${playerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
+    console.log(`🧟 Memulai serangan pada pemain ${playerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
 
     const playerState = playerStates[playerId];
-    if (!playerState || playerState.health <= 0 || !players.find((p) => p.id === playerId)?.is_alive) {
-      console.log(`⚠️ Pemain ${playerId} tidak valid untuk diserang (kesehatan: ${playerState?.health}, is_alive: ${players.find((p) => p.id === playerId)?.is_alive})`);
+    const player = players.find((p) => p.id === playerId);
+    if (!playerState || !player || newHealth <= 0 || !player.is_alive) {
+      console.log(`⚠️ Pemain ${playerId} tidak valid untuk diserang (kesehatan: ${playerState?.health}, is_alive: ${player?.is_alive})`);
       setAttackQueue((prev) => prev.filter((id) => id !== playerId));
       return;
     }
 
     if (zombieState.isAttacking) {
-      console.log(`⚠️ Zombie sudah menyerang pemain lain (${zombieState.targetPlayerId}), menambahkan ${playerId} ke antrian`);
+      console.log(`⚠️ Zombie sedang menyerang ${zombieState.targetPlayerId}, menambahkan ${playerId} ke antrian`);
       setAttackQueue((prev) => {
         if (!prev.includes(playerId)) {
           return [...prev, playerId];
@@ -200,7 +207,6 @@ export default function HostGamePage() {
       return;
     }
 
-    // Clear any existing interval to prevent overlap
     if (attackIntervalRef.current) {
       clearInterval(attackIntervalRef.current);
       attackIntervalRef.current = null;
@@ -233,7 +239,7 @@ export default function HostGamePage() {
 
     let progress = 0;
     attackIntervalRef.current = setInterval(() => {
-      progress += 0.02; // Slower progress for smoother animation (50ms * 50 = 2.5s duration)
+      progress += 0.02;
       setZombieState((prev) => ({
         ...prev,
         attackProgress: progress,
@@ -266,6 +272,7 @@ export default function HostGamePage() {
             ...prev[playerId],
             isBeingAttacked: false,
             attackIntensity: 0,
+            countdown: prev[playerId].speed <= 30 && prev[playerId].health > 0 && players.find((p) => p.id === playerId)?.is_alive ? 5 : undefined,
           },
         }));
 
@@ -282,22 +289,16 @@ export default function HostGamePage() {
             else console.log(`✅ Status is_being_attacked untuk ${playerId} direset di Supabase`);
           });
 
-        setRecentAttacks((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(playerId);
-          return newSet;
-        });
-
         setBackgroundFlash(false);
         setGameMode("normal");
 
-        // Process next player in queue
         setAttackQueue((prev) => {
           const nextQueue = prev.filter((id) => id !== playerId);
           if (nextQueue.length > 0) {
             const nextPlayerId = nextQueue[0];
             const nextState = playerStates[nextPlayerId];
-            if (nextState && nextState.speed <= 30 && nextState.health > 0 && players.find((p) => p.id === nextPlayerId)?.is_alive) {
+            const nextPlayer = players.find((p) => p.id === nextPlayerId);
+            if (nextState && nextState.speed <= 30 && nextState.health > 0 && nextPlayer?.is_alive) {
               console.log(`📋 Memproses antrian berikutnya: ${nextPlayerId}`);
               supabase
                 .from("player_health_states")
@@ -312,14 +313,15 @@ export default function HostGamePage() {
                 .then(({ error }) => {
                   if (error) {
                     console.error(`⚠️ Gagal memperbarui status kesehatan untuk ${nextPlayerId}:`, error);
+                    handleZombieAttack(nextPlayerId, Math.max(0, nextState.health - 1), nextState.speed); // Fallback
                     setAttackQueue((prev) => prev.filter((id) => id !== nextPlayerId));
                     return;
                   }
                   handleZombieAttack(nextPlayerId, Math.max(0, nextState.health - 1), nextState.speed);
                 });
             } else {
-              console.log(`⚠️ Pemain berikutnya ${nextPlayerId} tidak memenuhi syarat (kecepatan: ${nextState?.speed}, kesehatan: ${nextState?.health})`);
-              return nextQueue.filter((id) => id !== nextPlayerId);
+              console.log(`⚠️ Pemain berikutnya ${nextPlayerId} tidak memenuhi syarat (kecepatan: ${nextState?.speed}, kesehatan: ${nextState?.health}, is_alive: ${nextPlayer?.is_alive})`);
+              setAttackQueue((prev) => prev.filter((id) => id !== nextPlayerId));
             }
           }
           return nextQueue;
@@ -327,7 +329,6 @@ export default function HostGamePage() {
       }
     }, 50);
 
-    // Fallback timeout to ensure attack doesn't hang
     setTimeout(() => {
       if (attackIntervalRef.current && zombieState.isAttacking) {
         console.log(`🛑 Timeout cadangan: Memaksa reset serangan untuk ${playerId}`);
@@ -346,6 +347,7 @@ export default function HostGamePage() {
             ...prev[playerId],
             isBeingAttacked: false,
             attackIntensity: 0,
+            countdown: prev[playerId].speed <= 30 && prev[playerId].health > 0 && players.find((p) => p.id === playerId)?.is_alive ? 5 : undefined,
           },
         }));
         supabase
@@ -409,6 +411,81 @@ export default function HostGamePage() {
       });
   }, [zombieState, playerStates, gameRoom]);
 
+  const updateCountdown = useCallback(() => {
+    if (!gameRoom) {
+      console.log("⚠️ gameRoom kosong, lewati pembaruan countdown");
+      return;
+    }
+
+    setPlayerStates((prev) => {
+      const updatedStates = { ...prev };
+      const newAttackQueue = [...attackQueue];
+
+      Object.entries(updatedStates).forEach(([playerId, state]) => {
+        const player = players.find((p) => p.id === playerId);
+        if (!player || !state.countdown || state.isBeingAttacked || state.health <= 0 || state.speed > 30 || !player.is_alive) {
+          if (state.countdown !== undefined) {
+            console.log(`🚫 Menghapus countdown untuk ${playerId} karena tidak memenuhi syarat (kecepatan: ${state.speed}, kesehatan: ${state.health}, isBeingAttacked: ${state.isBeingAttacked}, is_alive: ${player?.is_alive})`);
+            updatedStates[playerId] = { ...state, countdown: undefined };
+            const index = newAttackQueue.indexOf(playerId);
+            if (index !== -1) {
+              newAttackQueue.splice(index, 1);
+            }
+          }
+          return;
+        }
+
+        const newCountdown = state.countdown - 1;
+        console.log(`⏲️ Countdown untuk ${playerId}: ${newCountdown}s`);
+
+        if (newCountdown <= 0) {
+          if (zombieState.isAttacking) {
+            console.log(`⚠️ Zombie sedang menyerang ${zombieState.targetPlayerId}, menunda serangan untuk ${playerId}`);
+            if (!newAttackQueue.includes(playerId)) {
+              newAttackQueue.push(playerId);
+            }
+            updatedStates[playerId] = { ...state, countdown: 5 }; // Reset countdown
+            return;
+          }
+
+          const newHealth = Math.max(0, state.health - 1);
+          console.log(`🧟 Memulai serangan pada ${playerId}! Kesehatan: ${newHealth}, Kecepatan: ${state.speed}`);
+          
+          supabase
+            .from("player_health_states")
+            .update({
+              health: newHealth,
+              speed: state.speed,
+              is_being_attacked: true,
+              last_attack_time: new Date().toISOString(),
+            })
+            .eq("player_id", playerId)
+            .eq("room_id", gameRoom.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error(`⚠️ Gagal memperbarui status kesehatan untuk ${playerId}:`, error);
+                // Fallback: tetap jalankan serangan
+                handleZombieAttack(playerId, newHealth, state.speed);
+                return;
+              }
+              handleZombieAttack(playerId, newHealth, state.speed);
+            });
+
+          updatedStates[playerId] = { ...state, countdown: undefined };
+          const index = newAttackQueue.indexOf(playerId);
+          if (index !== -1) {
+            newAttackQueue.splice(index, 1);
+          }
+        } else {
+          updatedStates[playerId] = { ...state, countdown: newCountdown };
+        }
+      });
+
+      setAttackQueue(newAttackQueue);
+      return updatedStates;
+    });
+  }, [gameRoom, playerStates, zombieState, handleZombieAttack, attackQueue, players]);
+
   const checkLowSpeedPlayers = useCallback(() => {
     if (!gameRoom) {
       console.log("⚠️ gameRoom kosong, lewati pemeriksaan kecepatan rendah");
@@ -419,23 +496,19 @@ export default function HostGamePage() {
     const eligiblePlayers = Object.entries(playerStates)
       .filter(([playerId, state]) => {
         const player = players.find((p) => p.id === playerId);
-        const lastAttackTime = state.lastAttackTime || 0;
-        const timeSinceLastAttack = (Date.now() - lastAttackTime) / 1000;
         const isEligible =
           state.speed <= 30 &&
           !state.isBeingAttacked &&
           state.health > 0 &&
           player?.is_alive &&
-          !recentAttacks.has(playerId) &&
-          timeSinceLastAttack >= 10; // Cegah serangan terlalu cepat
-        console.log(`Pemain ${playerId} memenuhi syarat: ${isEligible}, Kecepatan: ${state.speed}, Nyawa: ${state.health}, Waktu sejak serangan terakhir: ${timeSinceLastAttack}s`);
+          state.countdown === undefined;
+        console.log(`Pemain ${playerId} memenuhi syarat: ${isEligible}, Kecepatan: ${state.speed}, Kesehatan: ${state.health}, is_alive: ${player?.is_alive}`);
         return isEligible;
       })
       .sort(([, stateA], [, stateB]) => stateA.speed - stateB.speed);
 
     if (eligiblePlayers.length === 0) {
       console.log("🚫 Tidak ada pemain yang memenuhi syarat untuk diserang");
-      setAttackQueue([]);
       return;
     }
 
@@ -443,100 +516,16 @@ export default function HostGamePage() {
       if (!attackQueue.includes(playerId)) {
         console.log(`📋 Menambahkan ${playerId} ke antrian serangan (Kecepatan: ${state.speed})`);
         setAttackQueue((prev) => [...prev, playerId]);
-      }
-    });
-
-    if (attackQueue.length > 0 && !zombieState.isAttacking) {
-      const playerId = attackQueue[0];
-      const state = playerStates[playerId];
-      if (!state) {
-        console.log(`⚠️ Pemain ${playerId} tidak ditemukan di playerStates, menghapus dari antrian`);
-        setAttackQueue((prev) => prev.filter((id) => id !== playerId));
-        return;
-      }
-
-      if (state.countdown === undefined) {
-        console.log(`⏳ Memulai countdown 6 detik untuk ${playerId} (Kecepatan: ${state.speed})`);
         setPlayerStates((prev) => ({
           ...prev,
           [playerId]: {
             ...prev[playerId],
-            countdown: 6,
+            countdown: 5,
           },
         }));
       }
-
-      setPlayerStates((prev) => {
-        const updatedStates = { ...prev };
-        let attackTriggered = false;
-
-        attackQueue.forEach((queuedPlayerId) => {
-          const currentState = updatedStates[queuedPlayerId];
-          if (!currentState || currentState.countdown === undefined) return;
-
-          const newCountdown = currentState.countdown - 1;
-          console.log(`⏲️ Countdown untuk ${queuedPlayerId}: ${newCountdown}s`);
-
-          if (newCountdown <= 0 && currentState.speed <= 30 && !zombieState.isAttacking && attackQueue[0] === queuedPlayerId && !attackTriggered) {
-            const newHealth = Math.max(0, currentState.health - 1);
-            const newSpeed = currentState.speed;
-
-            console.log(`🧟 Memulai serangan pada ${queuedPlayerId}! Kesehatan: ${newHealth}, Kecepatan: ${newSpeed}`);
-            supabase
-              .from("player_health_states")
-              .update({
-                health: newHealth,
-                speed: newSpeed,
-                is_being_attacked: true,
-                last_attack_time: new Date().toISOString(),
-              })
-              .eq("player_id", queuedPlayerId)
-              .eq("room_id", gameRoom.id)
-              .then(({ error }) => {
-                if (error) {
-                  console.error(`⚠️ Gagal memperbarui status kesehatan untuk ${queuedPlayerId}:`, error);
-                  setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
-                  return;
-                }
-                handleZombieAttack(queuedPlayerId, newHealth, newSpeed);
-                attackTriggered = true;
-                setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
-              });
-
-            updatedStates[queuedPlayerId] = {
-              ...currentState,
-              countdown: undefined,
-            };
-          } else if (currentState.speed > 30 || currentState.health <= 0) {
-            console.log(`🚀 Kecepatan ${queuedPlayerId} meningkat ke ${currentState.speed} atau nyawa habis, membatalkan countdown`);
-            setAttackQueue((prev) => prev.filter((id) => id !== queuedPlayerId));
-            updatedStates[queuedPlayerId] = {
-              ...currentState,
-              countdown: undefined,
-            };
-          } else {
-            updatedStates[queuedPlayerId] = {
-              ...currentState,
-              countdown: newCountdown,
-            };
-          }
-        });
-
-        return updatedStates;
-      });
-    }
-
-    if (eligiblePlayers.length === 0 && attackQueue.length === 0 && !zombieState.isAttacking) {
-      setZombieState({
-        isAttacking: false,
-        targetPlayerId: null,
-        attackProgress: 0,
-        basePosition: 500,
-        currentPosition: 500,
-      });
-      console.log("🧟 Tidak ada pemain dengan kecepatan <= 30, zombie direset");
-    }
-  }, [playerStates, zombieState.isAttacking, handleZombieAttack, players, attackQueue, recentAttacks, gameRoom]);
+    });
+  }, [playerStates, players, attackQueue, gameRoom]);
 
   const checkInactivityPenalty = useCallback(() => {
     if (!gameRoom) {
@@ -569,7 +558,7 @@ export default function HostGamePage() {
               [state.player_id]: {
                 ...prev[state.player_id],
                 speed: newSpeed,
-                countdown: newSpeed <= 30 && !prev[state.player_id].isBeingAttacked && prev[state.player_id].health > 0 ? 6 : prev[state.player_id].countdown,
+                countdown: newSpeed <= 30 && !prev[state.player_id].isBeingAttacked && prev[state.player_id].health > 0 ? 5 : prev[state.player_id].countdown,
               },
             }));
           }
@@ -608,7 +597,12 @@ export default function HostGamePage() {
         .select("*")
         .eq("room_id", room.id);
 
-      if (healthError) console.error("Gagal mengambil status kesehatan:", healthError);
+      if (healthError) {
+        console.error("Gagal mengambil status kesehatan:", healthError);
+        setPlayerStates({});
+      } else {
+        initializePlayerStates(playersData || [], healthData || []);
+      }
 
       const { data: completionData, error: completionError } = await supabase
         .from("game_completions")
@@ -616,17 +610,14 @@ export default function HostGamePage() {
         .eq("room_id", room.id)
         .eq("completion_type", "completed");
 
-      if (completionError) console.error("Gagal mengambil data penyelesaian:", completionError);
-      else {
+      if (completionError) {
+        console.error("Gagal mengambil data penyelesaian:", completionError);
+      } else {
         const completed = completionData?.map((completion: any) => completion.players) || [];
         setCompletedPlayers(completed);
         if (completed.length > 0) {
           setShowCompletionPopup(true);
         }
-      }
-
-      if (playersData && playersData.length > 0) {
-        initializePlayerStates(playersData, healthData || []);
       }
 
       if (playersData && completionData && playersData.length === completionData.length) {
@@ -639,6 +630,8 @@ export default function HostGamePage() {
       }
     } catch (error) {
       console.error("Gagal mengambil data permainan:", error);
+      setPlayers([]);
+      setPlayerStates({});
     } finally {
       setIsLoading(false);
     }
@@ -692,10 +685,11 @@ export default function HostGamePage() {
               const newState = {
                 ...existingState,
                 health: healthState.health,
+                maxHealth: healthState.max_health,
                 speed: healthState.speed,
                 isBeingAttacked: healthState.is_being_attacked,
                 lastAttackTime: new Date(healthState.last_attack_time).getTime(),
-                countdown: healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 6 : undefined,
+                countdown: healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 && !existingState.isBeingAttacked ? 5 : existingState.countdown,
               };
               return {
                 ...prev,
@@ -703,15 +697,21 @@ export default function HostGamePage() {
               };
             });
 
-            // Trigger attack if not already attacking and speed is low
             if (healthState.speed <= 30 && !healthState.is_being_attacked && !zombieState.isAttacking && healthState.health > 0) {
-              console.log(`🧟 Memulai countdown serangan dari Supabase untuk ${healthState.player_id}`);
+              console.log(`🧟 Menambahkan ${healthState.player_id} ke antrian serangan dari Supabase`);
               setAttackQueue((prev) => {
                 if (!prev.includes(healthState.player_id)) {
                   return [...prev, healthState.player_id];
                 }
                 return prev;
               });
+              setPlayerStates((prev) => ({
+                ...prev,
+                [healthState.player_id]: {
+                  ...prev[healthState.player_id],
+                  countdown: 5,
+                },
+              }));
             }
           }
         }
@@ -799,6 +799,15 @@ export default function HostGamePage() {
   }, [checkLowSpeedPlayers, checkInactivityPenalty, gameRoom]);
 
   useEffect(() => {
+    if (!gameRoom) return;
+    const interval = setInterval(() => {
+      updateCountdown();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [updateCountdown, gameRoom]);
+
+  useEffect(() => {
     const testAllImages = async () => {
       const status: { [key: string]: boolean } = {};
       for (const character of characterGifs) {
@@ -846,6 +855,33 @@ export default function HostGamePage() {
     );
     return () => clearInterval(interval);
   }, [gameMode]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRecentAttacks((prev) => {
+        const newSet = new Set(prev);
+        newSet.forEach((playerId) => {
+          const playerState = playerStates[playerId];
+          if (playerState && (Date.now() - playerState.lastAttackTime) / 1000 > 10) {
+            newSet.delete(playerId);
+          }
+        });
+        return newSet;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [playerStates]);
+
+  useEffect(() => {
+    const checkConnection = () => {
+      const state = supabase.getChannels()[0]?.state || "closed";
+      setIsConnected(state === "joined");
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getLoopPosition = (speed: number, spacing: number, offset = 0) => {
     const totalDistance = screenWidth + spacing;
@@ -923,11 +959,11 @@ export default function HostGamePage() {
         gameRoom={gameRoom}
         roomCode={roomCode}
         playerStates={playerStates}
-        playerHealthStates={playerHealthStates}
         zombieState={zombieState}
         recentAttacks={recentAttacks}
         getCharacterByType={getCharacterByType}
         getWorkingImagePath={getWorkingImagePath}
+        isConnected={isConnected}
       />
       <RunningCharacters
         players={players}
@@ -1007,7 +1043,6 @@ export default function HostGamePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

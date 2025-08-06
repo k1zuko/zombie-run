@@ -130,7 +130,7 @@ export default function GameUI({
               ? "ZOMBIE MENDEKAT"
               : gameMode === "panic"
                 ? "THEY ARE EVERYWHERE!"
-                : "RUN OR BE EATEN!"}
+                : "."}
         </div>
 
         {/* Attack Progress Bar */}
