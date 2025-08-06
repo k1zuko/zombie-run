@@ -104,7 +104,8 @@ export function useGameLogic({ room, gameState, players, currentPlayer }: GameLo
             console.log("🩺 Processing health update for wrong answer...")
 
             // Get or create current health state
-            let { data: healthState, error: healthError } = await supabase
+            let healthState = null;
+            const { data: healthState, error: healthError } = await supabase
               .from("player_health_states")
               .select("*")
               .eq("player_id", currentPlayer.id)
