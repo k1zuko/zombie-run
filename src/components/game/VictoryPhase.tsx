@@ -47,7 +47,7 @@ export default function VictoryPhase({ currentPlayer, gameLogic, questionsAnswer
           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", duration: 0.8 }}>
             <Trophy className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
             <h1 className="text-3xl font-bold text-white mb-2">Congratulations!</h1>
-            <p className="text-purple-300">You've completed all {questionsAnswered} questions!</p>
+            <p className="text-purple-300">You&apos;ve completed all {questionsAnswered} questions!</p>
           </motion.div>
 
           {/* Player Stats */}
