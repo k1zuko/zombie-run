@@ -79,8 +79,8 @@ export default function ZombieCharacter({
           style={{
             imageRendering: "pixelated",
             filter: zombieState.isAttacking
-              ? "brightness(1.4) contrast(1.6) saturate(1.4) drop-shadow(0 0 20px rgba(255,50,50,0.8))"
-              : gameMode === "panic"
+            ? "brightness(1.4) contrast(1.6) saturate(1.4) drop-shadow(0 0 20px rgba(255,50,50,0.8))"
+            : gameMode === "panic"
                 ? "brightness(1.3) contrast(1.5) saturate(1.3) drop-shadow(0 0 10px rgba(255,50,50,0.5))"
                 : "brightness(1.1) contrast(1.2)",
             transform: `scale(${currentMovement.scale}) rotate(${currentMovement.rotation}deg)`,
@@ -108,6 +108,7 @@ export default function ZombieCharacter({
                   animation: `fadeOut 0.6s ${i * 0.15}s forwards`,
                 }}
               />
+          <audio src="/musics/rarrgh.mp3" autoPlay/>
             </div>
           ))}
 
