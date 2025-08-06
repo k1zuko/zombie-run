@@ -117,7 +117,7 @@ export default function RunningCharacters({
           speedOffset +
           Math.sin(animationTime * (gameMode === "panic" ? 1.2 : 0.4) + i) * (gameMode === "panic" ? 60 : 15);
         const charY =
-          -30 +
+          -60 +
           Math.abs(Math.sin(animationTime * (gameMode === "panic" ? 2 : 0.6) + i * 0.5)) *
           (gameMode === "panic" ? 25 : 8);
 

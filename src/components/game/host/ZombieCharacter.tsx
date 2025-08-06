@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 interface ZombieState {
   isAttacking: boolean;
@@ -16,16 +16,50 @@ interface ZombieCharacterProps {
   animationTime: number;
   gameMode: "normal" | "panic";
   centerX: number;
+  chaserType: string; // Prop untuk tipe pengejar
 }
+
+// Daftar karakter pengejar dengan path gambar dan nama alternatif
+const chaserImages = {
+  zombie: {
+    src: "/images/zombie.gif",
+    alt: "Zombie",
+  },
+  monster1: {
+    src: "/images/monster1.gif",
+    alt: "Monster 1",
+  },
+  monster2: {
+    src: "/images/monster2.gif",
+    alt: "Monster 2",
+  },
+  darknight: {
+    src: "/images/darknight.gif",
+    alt: "Dark Knight",
+  },
+};
 
 export default function ZombieCharacter({
   zombieState,
   animationTime,
   gameMode,
   centerX,
+  chaserType,
 }: ZombieCharacterProps) {
   const attackRef = useRef<HTMLDivElement>(null);
   const ZOMBIE_SPEED = 30;
+
+  // Memilih gambar pengejar berdasarkan chaserType, default ke zombie jika tidak ditemukan
+  const selectedChaser = chaserImages[chaserType as keyof typeof chaserImages] || chaserImages.zombie;
+
+  // Logging untuk debugging
+  useEffect(() => {
+    console.log("ZombieCharacter render:", {
+      chaserType,
+      selectedChaser: selectedChaser.src,
+      isAttacking: zombieState.isAttacking,
+    });
+  }, [chaserType, zombieState.isAttacking, selectedChaser.src]);
 
   const normalMovement = {
     x: Math.sin(animationTime * 0.4) * (gameMode === "panic" ? 140 : 30),
@@ -49,7 +83,7 @@ export default function ZombieCharacter({
       className="absolute z-40 origin-bottom"
       style={{
         left: `${centerX - zombieState.currentPosition + currentMovement.x}px`,
-        top: "80%",
+        top: "83%",
         transform: `translateY(${currentMovement.y}px)`,
         transition: zombieState.isAttacking ? "transform 0.05s linear" : "transform 0.1s ease-out",
       }}
@@ -58,7 +92,7 @@ export default function ZombieCharacter({
         {/* Indikator serangan */}
         {zombieState.isAttacking && (
           <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1.5 rounded text-sm bg-red-800/90 text-white animate-pulse border border-red-500 shadow-lg">
-            MENYERANG! 🧟‍♂️
+            
           </div>
         )}
 
@@ -70,8 +104,8 @@ export default function ZombieCharacter({
         )}
 
         <Image
-          src="/images/zombie.gif"
-          alt="Zombie"
+          src={selectedChaser.src}
+          alt={selectedChaser.alt}
           width={140}
           height={140}
           className="drop-shadow-lg"
@@ -89,13 +123,13 @@ export default function ZombieCharacter({
           }}
         />
 
-        {/* Jejak zombie saat menyerang */}
+        {/* Jejak pengejar saat menyerang */}
         {zombieState.isAttacking &&
           [...Array(4)].map((_, i) => (
             <div key={`blood-trail-${i}`} className="absolute top-0 left-0">
               <Image
-                src="/images/zombie.gif"
-                alt="Zombie Trail"
+                src={selectedChaser.src}
+                alt={`${selectedChaser.alt} Trail`}
                 width={140}
                 height={140}
                 className="absolute"
@@ -122,7 +156,7 @@ export default function ZombieCharacter({
           }`}
         />
 
-        {/* Indikator kecepatan zombie */}
+        {/* Indikator kecepatan pengejar */}
         <p
           className={`absolute -bottom-8 left-1/2 transform -translate-x-1/2 font-mono text-sm ${
             zombieState.isAttacking ? "text-red-400 animate-pulse" : "text-gray-400"

@@ -6,19 +6,21 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export type GameRoom = {
-  id: string
-  room_code: string
-  host_player_id: string | null // Combines host_id and host_player_id
-  question_set_id: string | null // From second definition, for question set reference
-  title: string | null // From first definition, optional
-  status: "waiting" | "playing" | "finished"
-  current_phase: "lobby" | "quiz" | "minigame" | "finished"
-  max_players: number // Used in HostPage.tsx for player count display
-  duration: number // Used in HostPage.tsx for duration display
-  questions: any[] // Used in HostPage.tsx, can be refined later
-  created_at: string
-  updated_at: string
-}
+  question_count: number; // Diperbaiki dari 'any' menjadi 'number' untuk konsistensi
+  id: string;
+  room_code: string;
+  host_player_id: string | null; // Combines host_id and host_player_id
+  question_set_id: string | null; // From second definition, for question set reference
+  title: string | null; // From first definition, optional
+  status: "waiting" | "playing" | "finished";
+  current_phase: "lobby" | "quiz" | "minigame" | "finished";
+  max_players: number; // Used in HostPage.tsx for player count display
+  duration: number; // Used in HostPage.tsx for duration display
+  questions: any[]; // Used in HostPage.tsx, can be refined later
+  created_at: string;
+  updated_at: string;
+  chaser_type: 'zombie' | 'monster1' | 'monster2' | 'darknight'; // Ditambahkan untuk mendukung pemilihan karakter pengejar
+};
 
 export type Player = {
   id: string

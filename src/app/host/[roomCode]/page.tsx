@@ -1,101 +1,145 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useCallback } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Users, Play, Settings, Copy, Check, Clock, Trophy, Zap, Wifi } from "lucide-react"
-import { supabase, type GameRoom, type Player } from "@/lib/supabase"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Users, Play, Settings, Copy, Check, Clock, Trophy, Zap, Wifi } from "lucide-react";
+import { supabase, type Player } from "@/lib/supabase";
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+
+// Interface untuk GameRoom dengan chaser_type
+interface GameRoom {
+  id: string;
+  room_code: string;
+  title: string | null;
+  status: "waiting" | "playing" | "finished";
+  max_players: number;
+  duration: number | null;
+  question_count: number | null;
+  current_phase: "lobby" | "quiz" | "minigame" | "finished";
+  questions: any[] | null;
+  created_at: string;
+  updated_at: string;
+  chaser_type: "zombie" | "monster1" | "monster2" | "darknight";
+}
+
+const chaserOptions = [
+  {
+    value: "zombie" as const,
+    name: "Zombie",
+    gif: "/images/zombie.gif",
+    alt: "Zombie Pengejar",
+  },
+  {
+    value: "monster1" as const,
+    name: "Mutant Gila",
+    gif: "/images/monster1.gif",
+    alt: "Mutant Gila Pengejar",
+  },
+  {
+    value: "monster2" as const,
+    name: "Anjing Neraka",
+    gif: "/images/monster2.gif",
+    alt: "Anjing Neraka Pengejar",
+  },
+  {
+    value: "darknight" as const,
+    name: "Raja Kegelapan",
+    gif: "/images/darknight.gif",
+    alt: "Raja Kegelapan Pengejar",
+  },
+];
 
 export default function HostPage() {
-  const params = useParams()
-  const router = useRouter()
-  const roomCode = params.roomCode as string
+  const params = useParams();
+  const router = useRouter();
+  const roomCode = params.roomCode as string;
 
-  const [room, setRoom] = useState<GameRoom | null>(null)
-  const [players, setPlayers] = useState<Player[]>([])
-  const [copied, setCopied] = useState(false)
-  const [isStarting, setIsStarting] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connecting")
-  const [countdown, setCountdown] = useState<number | null>(null)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [copied, setCopied] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<"connected" | "connecting" | "disconnected">("connecting");
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [gameDuration, setGameDuration] = useState<string>("600");
+  const [questionCount, setQuestionCount] = useState<string>("20");
+  const [chaserType, setChaserType] = useState<"zombie" | "monster1" | "monster2" | "darknight">("zombie");
 
-  // Pengaturan Game
-  const [gameDuration, setGameDuration] = useState<string>("600") // Default 10 menit (dalam detik)
-  const [questionCount, setQuestionCount] = useState<string>("20") // Default 20 soal
+  const TOTAL_QUESTIONS_AVAILABLE = 50;
 
-  const TOTAL_QUESTIONS_AVAILABLE = 50; // Total soal yang tersedia
-
-  // Fetch room data
+  // Mengambil data ruangan dari Supabase
   const fetchRoom = useCallback(async () => {
-    if (!roomCode) return
+    if (!roomCode) return;
 
     try {
-      const { data, error } = await supabase.from("game_rooms").select("*").eq("room_code", roomCode).single()
+      const { data, error } = await supabase.from("game_rooms").select("*").eq("room_code", roomCode).single();
 
       if (error || !data) {
-        console.error("Room not found:", error)
-        router.push("/")
-        return
+        console.error("Room tidak ditemukan:", error);
+        router.push("/");
+        return;
       }
 
-      console.log("Fetched room:", data)
-      setRoom(data)
-      setGameDuration(data.duration?.toString() || "600")
-      setQuestionCount(data.question_count?.toString() || "20")
-      return data
+      console.log("Mengambil room:", { ...data, chaser_type: data.chaser_type });
+      setRoom(data);
+      setGameDuration(data.duration?.toString() || "600");
+      setQuestionCount(data.question_count?.toString() || "20");
+      setChaserType(data.chaser_type || "zombie");
+      return data;
     } catch (error) {
-      console.error("Error fetching room:", error)
-      router.push("/")
+      console.error("Error mengambil room:", error);
+      router.push("/");
     }
-  }, [roomCode, router])
+  }, [roomCode, router]);
 
-  // Fetch players data
+  // Mengambil data pemain dari Supabase
   const fetchPlayers = useCallback(async (roomId: string) => {
     try {
       const { data, error } = await supabase
         .from("players")
         .select("*")
         .eq("room_id", roomId)
-        .order("joined_at", { ascending: true })
+        .order("joined_at", { ascending: true });
 
       if (error) {
-        console.error("Error fetching players:", error)
-        return
+        console.error("Error mengambil pemain:", error);
+        return;
       }
 
-      console.log("Fetched players:", data)
-      setPlayers(data || [])
+      console.log("Mengambil pemain:", data);
+      setPlayers(data || []);
     } catch (error) {
-      console.error("Error fetching players:", error)
+      console.error("Error mengambil pemain:", error);
     }
-  }, [])
+  }, []);
 
-  // Initialize data
+  // Inisialisasi data saat komponen dimuat
   useEffect(() => {
     const initializeData = async () => {
-      setIsLoading(true)
-      const roomData = await fetchRoom()
+      setIsLoading(true);
+      const roomData = await fetchRoom();
       if (roomData) {
-        await fetchPlayers(roomData.id)
+        await fetchPlayers(roomData.id);
       }
-      setIsLoading(false)
-    }
+      setIsLoading(false);
+    };
 
-    initializeData()
-  }, [fetchRoom, fetchPlayers])
+    initializeData();
+  }, [fetchRoom, fetchPlayers]);
 
-  // Setup realtime subscriptions
+  // Mengatur langganan real-time Supabase
   useEffect(() => {
-    if (!room?.id) return
+    if (!room?.id) return;
 
-    console.log("Setting up realtime for room:", room.id)
+    console.log("Menyiapkan realtime untuk room:", room.id);
 
     const channel = supabase
       .channel(`room_${room.id}_host`)
@@ -108,8 +152,8 @@ export default function HostPage() {
           filter: `room_id=eq.${room.id}`,
         },
         (payload) => {
-          console.log("Players change detected:", payload)
-          fetchPlayers(room.id)
+          console.log("Perubahan pemain terdeteksi:", payload);
+          fetchPlayers(room.id);
         }
       )
       .on(
@@ -121,42 +165,46 @@ export default function HostPage() {
           filter: `id=eq.${room.id}`,
         },
         (payload) => {
-          console.log("Room change detected:", payload)
-          setRoom(payload.new as GameRoom)
-          setGameDuration((payload.new as GameRoom).duration?.toString() || "600")
-          setQuestionCount((payload.new as GameRoom).question_count?.toString() || "20")
-          if (payload.new.current_phase === "quiz") {
-            console.log("Redirecting host to quiz page:", `/game/${roomCode}/host`)
-            router.push(`/game/${roomCode}/host`)
+          console.log("Perubahan room terdeteksi:", { ...payload.new, chaser_type: payload.new.chaser_type });
+          const newRoom = payload.new as GameRoom;
+          setRoom(newRoom);
+          setGameDuration(newRoom.duration?.toString() || "600");
+          setQuestionCount(newRoom.question_count?.toString() || "20");
+          setChaserType(newRoom.chaser_type || "zombie");
+          if (newRoom.current_phase === "quiz") {
+            console.log("Mengalihkan host ke halaman quiz:", `/game/${roomCode}/host`);
+            router.push(`/game/${roomCode}/host`);
           }
         }
       )
       .subscribe((status, err) => {
-        console.log("Subscription status:", status, err ? err.message : "")
+        console.log("Status langganan:", status, err ? err.message : "");
         if (status === "SUBSCRIBED") {
-          setConnectionStatus("connected")
+          setConnectionStatus("connected");
         } else if (status === "CHANNEL_ERROR") {
-          setConnectionStatus("disconnected")
-          console.error("Subscription error:", err?.message)
+          setConnectionStatus("disconnected");
+          console.error("Error langganan:", err?.message);
         } else {
-          setConnectionStatus("connecting")
+          setConnectionStatus("connecting");
         }
-      })
+      });
 
     return () => {
-      console.log("Unsubscribing from channel")
-      channel.unsubscribe()
-    }
-  }, [room?.id, fetchPlayers, roomCode, router])
+      console.log("Berhenti berlangganan dari channel");
+      channel.unsubscribe();
+    };
+  }, [room?.id, fetchPlayers, roomCode, router]);
 
+  // Menyalin kode ruangan ke clipboard
   const copyRoomCode = async () => {
-    await navigator.clipboard.writeText(roomCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    await navigator.clipboard.writeText(roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
+  // Menyimpan pengaturan ke Supabase
   const saveSettings = async () => {
-    if (!room) return
+    if (!room) return;
 
     try {
       const { error } = await supabase
@@ -164,38 +212,44 @@ export default function HostPage() {
         .update({
           duration: parseInt(gameDuration),
           question_count: parseInt(questionCount),
+          chaser_type: chaserType,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", room.id)
+        .eq("id", room.id);
 
       if (error) {
-        throw new Error(`Gagal menyimpan pengaturan: ${error.message}`)
+        throw new Error(`Gagal menyimpan pengaturan: ${error.message}`);
       }
 
-      console.log("Settings saved:", { duration: parseInt(gameDuration), question_count: parseInt(questionCount) })
+      console.log("Pengaturan disimpan:", {
+        duration: parseInt(gameDuration),
+        question_count: parseInt(questionCount),
+        chaser_type: chaserType,
+      });
       setRoom({
         ...room,
         duration: parseInt(gameDuration),
         question_count: parseInt(questionCount),
-      })
-      setIsSettingsOpen(false)
+        chaser_type: chaserType,
+      });
+      setIsSettingsOpen(false);
     } catch (error) {
-      console.error("Error saving settings:", error)
-      alert("Gagal menyimpan pengaturan: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"))
+      console.error("Error menyimpan pengaturan:", error);
+      alert("Gagal menyimpan pengaturan: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
     }
-  }
+  };
 
+  // Memulai permainan
   const startGame = async () => {
     if (!room || players.length === 0) {
-      console.error("Cannot start game: No room or players")
-      alert("Gagal memulai game: Tidak ada ruangan atau pemain.")
-      return
+      console.error("Tidak dapat memulai game: Tidak ada room atau pemain");
+      alert("Gagal memulai game: Tidak ada ruangan atau pemain.");
+      return;
     }
 
-    setIsStarting(true)
+    setIsStarting(true);
 
     try {
-      // Fetch and randomize questions from quiz_questions
       const { data: questions, error: quizError } = await supabase
         .from("quiz_questions")
         .select("id, question_type, question_text, image_url, options, correct_answer");
@@ -204,46 +258,39 @@ export default function HostPage() {
         throw new Error(`Gagal mengambil soal: ${quizError?.message || "Bank soal kosong"}`);
       }
 
-
-      // Randomize questions and select based on question_count
       const selectedQuestionCount = parseInt(questionCount);
-
       const shuffledQuestions = questions
         .map((value) => ({ value, sort: Math.random() }))
         .sort((a, b) => a.sort - b.sort)
         .map(({ value }) => value)
         .slice(0, Math.min(selectedQuestionCount, questions.length));
 
-
       const formattedQuestions = shuffledQuestions.map((q, index) => ({
         id: q.id,
         question_index: index + 1,
-        question_type: q.question_type, // 'TEXT' atau 'IMAGE'
-        question_text: q.question_text, // Teks pertanyaan
-        image_url: q.image_url,         // URL gambar (bisa null)
-        options: q.options,             // Array pilihan jawaban
-        correct_answer: q.correct_answer, // Jawaban benar
+        question_type: q.question_type,
+        question_text: q.question_text,
+        image_url: q.image_url,
+        options: q.options,
+        correct_answer: q.correct_answer,
       }));
 
-
-      // Update game_rooms with randomized questions and game settings
       const { error: roomError } = await supabase
         .from("game_rooms")
         .update({
           status: "playing",
           current_phase: "quiz",
-          questions: formattedQuestions, // Simpan soal yang sudah diformat
+          questions: formattedQuestions,
           duration: parseInt(gameDuration),
+          chaser_type: chaserType,
           updated_at: new Date().toISOString(),
         })
         .eq("id", room.id);
 
-
       if (roomError) {
-        throw new Error(`Gagal memulai game: ${roomError.message}`)
+        throw new Error(`Gagal memulai game: ${roomError.message}`);
       }
 
-      // Initialize game state
       const { error: stateError } = await supabase.from("game_states").insert({
         room_id: room.id,
         phase: "quiz",
@@ -254,27 +301,27 @@ export default function HostPage() {
         current_question_index: 0,
         status: "playing",
         created_at: new Date().toISOString(),
-      })
+      });
 
       if (stateError) {
-        throw new Error(`Gagal membuat status permainan: ${stateError.message}`)
+        throw new Error(`Gagal membuat status permainan: ${stateError.message}`);
       }
 
-      console.log("Game started successfully")
+      console.log("Game berhasil dimulai");
     } catch (error) {
-      console.error("Error starting game:", error)
-      alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"))
+      console.error("Error memulai game:", error);
+      alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
     } finally {
-      setIsStarting(false)
+      setIsStarting(false);
     }
-  }
+  };
 
   const characterEmojis = {
     robot1: "🤖",
     robot2: "🦾",
     robot3: "🚀",
     robot4: "⚡",
-  }
+  };
 
   if (isLoading) {
     return (
@@ -285,7 +332,7 @@ export default function HostPage() {
           className="w-8 h-8 border-2 border-white border-t-transparent rounded-full"
         />
       </div>
-    )
+    );
   }
 
   if (!room) {
@@ -293,7 +340,7 @@ export default function HostPage() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white text-xl">Room tidak ditemukan</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -556,22 +603,23 @@ export default function HostPage() {
             </motion.div>
           )}
 
-          {/* Dialog Pengaturan */}
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-            <DialogContent className="bg-black/95 text-white border-white/20 max-w-md rounded-xl">
+            <DialogContent className="bg-black/95 text-white border-red-500/50 max-w-lg rounded-xl p-6 shadow-[0_0_15px_rgba(255,0,0,0.5)]">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold">Pengaturan Permainan</DialogTitle>
+                <DialogTitle className="text-3xl font-bold text-red-400 font-mono tracking-wide">
+                  Pengaturan Permainan
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-6 py-6">
+              <div className="space-y-8 py-6">
                 <div>
-                  <Label htmlFor="duration" className="text-white mb-2 block font-medium">
+                  <Label htmlFor="duration" className="text-white mb-2 block font-medium text-lg">
                     Durasi Permainan
                   </Label>
                   <Select value={gameDuration} onValueChange={setGameDuration}>
-                    <SelectTrigger className="w-full bg-white/10 border-white/20 text-white rounded-lg">
+                    <SelectTrigger className="w-full bg-white/10 border-red-500/30 text-white rounded-lg hover:bg-red-500/20 transition-colors">
                       <SelectValue placeholder="Pilih durasi" />
                     </SelectTrigger>
-                    <SelectContent className="bg-black/95 text-white border-white/20 rounded-lg">
+                    <SelectContent className="bg-black/95 text-white border-red-500/30 rounded-lg">
                       <SelectItem value="180">3 Menit</SelectItem>
                       <SelectItem value="300">5 Menit</SelectItem>
                       <SelectItem value="420">7 Menit</SelectItem>
@@ -583,14 +631,14 @@ export default function HostPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="questionCount" className="text-white mb-2 block font-medium">
+                  <Label htmlFor="questionCount" className="text-white mb-2 block font-medium text-lg">
                     Jumlah Soal
                   </Label>
                   <Select value={questionCount} onValueChange={setQuestionCount}>
-                    <SelectTrigger className="w-full bg-white/10 border-white/20 text-white rounded-lg">
+                    <SelectTrigger className="w-full bg-white/10 border-red-500/30 text-white rounded-lg hover:bg-red-500/20 transition-colors">
                       <SelectValue placeholder="Pilih jumlah soal" />
                     </SelectTrigger>
-                    <SelectContent className="bg-black/95 text-white border-white/20 rounded-lg">
+                    <SelectContent className="bg-black/95 text-white border-red-500/30 rounded-lg">
                       <SelectItem value="10">10 Soal</SelectItem>
                       <SelectItem value="20">20 Soal</SelectItem>
                       <SelectItem value="30">30 Soal</SelectItem>
@@ -598,6 +646,46 @@ export default function HostPage() {
                       <SelectItem value="50">50 Soal</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div>
+                  <Label className="text-white mb-4 block font-medium text-lg">
+                    Karakter Pengejar
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {chaserOptions.map((chaser) => (
+                      <div
+                        key={chaser.value}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setChaserType(chaser.value);
+                          console.log(`Selected chaser: ${chaser.name} (${chaser.value})`);
+                        }}
+                        onKeyDown={(e) => e.key === "Enter" && setChaserType(chaser.value)}
+                        className={`relative flex flex-col items-center p-4 rounded-lg cursor-pointer transition-all duration-300
+                          ${chaserType === chaser.value ? 'border-2 border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.7)] bg-red-900/30' : 'border border-white/20 bg-white/10 hover:bg-red-500/20 hover:shadow-[0_0_8px_rgba(255,0,0,0.5)]'}
+                          hover:scale-105`}
+                      >
+                        <div className="relative w-24 h-24 mb-2">
+                          <Image
+                            src={chaser.gif}
+                            alt={chaser.alt}
+                            fill
+                            className="object-contain"
+                            unoptimized
+                            style={{ imageRendering: "pixelated" }}
+                          />
+                        </div>
+                        <span className="text-white font-mono text-sm text-center">
+                          {chaser.name}
+                        </span>
+                        {chaserType === chaser.value && (
+                          <span className="absolute top-2 right-2 text-red-400 text-xs font-bold">✔</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -620,5 +708,5 @@ export default function HostPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
