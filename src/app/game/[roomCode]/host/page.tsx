@@ -874,11 +874,12 @@ export default function HostGamePage() {
     <div
       className="relative w-full h-screen bg-black overflow-hidden"
       style={{
-        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${
-          Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)
-        }px)`,
+        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)
+          }px)`,
       }}
     >
+      <audio src="/musics/zombies.mp3" autoPlay />
+      <audio src="/musics/background-music.mp3" autoPlay loop />
       <AnimatePresence>
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 max-w-[240px] max-h-[400px] overflow-y-auto">
           {Object.entries(playerStates)
@@ -953,59 +954,59 @@ export default function HostGamePage() {
         playerHealthStates={playerHealthStates}
       />
 
-<AnimatePresence>
-  {showCompletionPopup && completedPlayers.length > 0 && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={() => setShowCompletionPopup(false)}
-    >
-      <motion.div
-        initial={{ scale: 0.8, y: 50 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.8, y: 50 }}
-        className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-2xl font-bold text-white font-mono mb-4">
-          Selamat Anda Lolos dari Kejaran!
-        </h2>
-        <div className="flex justify-center gap-4 mb-6">
-          {completedPlayers.map((player) => {
-            const character = getCharacterByType(player.character_type);
-            return (
-              <img
-                key={player.id}
-                src={getWorkingImagePath(character)}
-                alt={character.alt}
-                className="w-16 h-16 object-contain"
-              />
-            );
-          })}
-        </div>
-        <div className="text-white font-mono mb-6">
-          <p className="text-lg mb-2">Pemain yang Lolos:</p>
-          <ul className="list-disc list-inside">
-            {completedPlayers.map((player) => (
-              <li key={player.id}>{player.nickname}</li>
-            ))}
-          </ul>
-        </div>
-        <button
-          onClick={() => {
-            setShowCompletionPopup(false);
-            router.push(`/game/${roomCode}/results`);
-          }}
-          className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
-        >
-          Lihat Hasil
-        </button>
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+      <AnimatePresence>
+        {showCompletionPopup && completedPlayers.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowCompletionPopup(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 50 }}
+              className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold text-white font-mono mb-4">
+                Selamat Anda Lolos dari Kejaran!
+              </h2>
+              <div className="flex justify-center gap-4 mb-6">
+                {completedPlayers.map((player) => {
+                  const character = getCharacterByType(player.character_type);
+                  return (
+                    <img
+                      key={player.id}
+                      src={getWorkingImagePath(character)}
+                      alt={character.alt}
+                      className="w-16 h-16 object-contain"
+                    />
+                  );
+                })}
+              </div>
+              <div className="text-white font-mono mb-6">
+                <p className="text-lg mb-2">Pemain yang Lolos:</p>
+                <ul className="list-disc list-inside">
+                  {completedPlayers.map((player) => (
+                    <li key={player.id}>{player.nickname}</li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  setShowCompletionPopup(false);
+                  router.push(`/game/${roomCode}/results`);
+                }}
+                className="bg-red-600 hover:bg-red-500 text-white font-mono py-2 px-4 rounded"
+              >
+                Lihat Hasil
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

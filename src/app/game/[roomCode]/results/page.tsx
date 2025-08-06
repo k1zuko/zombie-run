@@ -605,7 +605,7 @@ export default function ResultsPage() {
           <div className="flex items-center justify-center mb-6">
             <Skull className="w-8 h-8 text-red-500 mr-3 animate-pulse" />
             <h1 className="text-5xl font-bold text-white font-horror tracking-wider text-red-600 drop-shadow-[0_0_8px_rgba(255,0,0,0.7)]">
-              LAPORAN MIMPI BURUK
+              Hasil Permainan
             </h1>
             <Skull className="w-8 h-8 text-red-500 ml-3 animate-pulse" />
           </div>
@@ -697,7 +697,7 @@ export default function ResultsPage() {
           </HorrorCard>
         </motion.div>
 
-        {roomStats && (
+        {/* {roomStats && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -708,7 +708,7 @@ export default function ResultsPage() {
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Skull className="w-5 h-5 mr-2 text-red-500" />
                   INFORMASI RUANGAN
-                  {/* <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge> */}
+                  <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge>
                 </h3>
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -740,7 +740,7 @@ export default function ResultsPage() {
               </div>
             </HorrorCard>
           </motion.div>
-        )}
+        )} */}
 
         {playerStats.length > 0 && (
           <motion.div
