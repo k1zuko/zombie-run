@@ -125,7 +125,7 @@ export default function GameUI({
           style={{ fontFamily: "'Creepster', cursive" }}
         >
           {zombieState.isAttacking
-            ? "WASPADA!"
+            ? "!"
             : isPlayerClose
               ? "ZOMBIE MENDEKAT"
               : gameMode === "panic"
@@ -134,7 +134,7 @@ export default function GameUI({
         </div>
 
         {/* Attack Progress Bar */}
-        {zombieState.isAttacking && (
+        {/* {zombieState.isAttacking && (
           <div className="mt-3 w-48 bg-red-900/30 rounded-full h-4 overflow-hidden">
             <div
               className="h-full bg-red-600 rounded-full transition-all duration-300"
@@ -144,7 +144,7 @@ export default function GameUI({
               FEEDING: {Math.floor(zombieState.attackProgress * 100)}%
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Subtle Blood Splatter Overlay */}

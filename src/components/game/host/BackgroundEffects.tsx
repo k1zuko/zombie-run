@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import Image from "next/image"
-import { Zap } from "lucide-react"
+import Image from "next/image";
+import { Zap } from "lucide-react";
 
 interface BackgroundEffectsProps {
-  animationTime: number
-  gameMode: "normal" | "panic"
-  screenWidth: number
-  backgroundFlash: boolean
-  getLoopPosition: (speed: number, spacing: number, offset?: number) => number
+  animationTime: number;
+  gameMode: "normal" | "panic";
+  screenWidth: number;
+  backgroundFlash: boolean;
+  getLoopPosition: (speed: number, spacing: number, offset?: number) => number;
 }
 
 export default function BackgroundEffects({
@@ -30,7 +30,7 @@ export default function BackgroundEffects({
         />
       )}
       <div className="absolute inset-0 z-5">
-        {[...Array(gameMode === "panic" ? 40 : 20)].map((_, i) => (
+        {[...Array(gameMode === "panic" ? 20 : 10)].map((_, i) => (
           <div
             key={`speedline-${i}`}
             className="absolute w-32 h-0.5 bg-white opacity-20"
@@ -44,10 +44,10 @@ export default function BackgroundEffects({
       </div>
       {gameMode === "panic" && (
         <div className="absolute inset-0 z-5">
-          {Math.random() > 0.95 && <div className="absolute inset-0 bg-white opacity-30 animate-pulse" />}
-          {[...Array(3)].map(
+          {Math.random() > 0.98 && <div className="absolute inset-0 bg-white opacity-30 animate-pulse" />}
+          {[...Array(2)].map(
             (_, i) =>
-              Math.random() > 0.98 && (
+              Math.random() > 0.99 && (
                 <Zap
                   key={`lightning-${i}`}
                   className="absolute w-8 h-8 text-white opacity-60"
@@ -61,7 +61,7 @@ export default function BackgroundEffects({
         </div>
       )}
       <div className="absolute bottom-0 left-0 right-0 z-25">
-        {[...Array(6)].map((_, i) => (
+        {[...Array(4)].map((_, i) => (
           <div
             key={`ground-fog-${i}`}
             className="absolute bottom-0 opacity-40"
@@ -84,7 +84,7 @@ export default function BackgroundEffects({
             />
           </div>
         ))}
-        {[...Array(4)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <div
             key={`volume-fog-${i}`}
             className="absolute opacity-30"
@@ -112,7 +112,7 @@ export default function BackgroundEffects({
         ))}
       </div>
       <div className="absolute bottom-16 left-0 right-0 z-25">
-        {[...Array(gameMode === "panic" ? 50 : 20)].map((_, i) => (
+        {[...Array(gameMode === "panic" ? 25 : 10)].map((_, i) => (
           <div
             key={`dust-${i}`}
             className="absolute w-2 h-2 bg-gray-400 rounded-full opacity-40"
@@ -125,7 +125,7 @@ export default function BackgroundEffects({
         ))}
       </div>
       <div className="absolute inset-0 z-25">
-        {[...Array(gameMode === "panic" ? 30 : 12)].map((_, i) => (
+        {[...Array(gameMode === "panic" ? 15 : 6)].map((_, i) => (
           <div
             key={`debris-${i}`}
             className="absolute w-1 h-4 bg-gray-500 opacity-50"
@@ -138,7 +138,7 @@ export default function BackgroundEffects({
         ))}
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-20 z-20">
-        {[...Array(40)].map((_, i) => (
+        {[...Array(20)].map((_, i) => (
           <div
             key={`grass-${i}`}
             className="absolute bottom-0 w-8 h-24 bg-gradient-to-t from-gray-500 via-gray-600 to-transparent opacity-60 rounded-t-lg"
@@ -160,7 +160,7 @@ export default function BackgroundEffects({
         <div className="absolute bottom-0 left-0 right-0 h-60 bg-gradient-to-t from-gray-800 to-transparent opacity-50" />
       </div>
       <div className="absolute inset-0 z-26">
-        {[...Array(gameMode === "panic" ? 60 : 30)].map((_, i) => (
+        {[...Array(gameMode === "panic" ? 30 : 15)].map((_, i) => (
           <div
             key={`particle-${i}`}
             className="absolute w-1 h-1 bg-gray-300 rounded-full opacity-20"
@@ -180,5 +180,5 @@ export default function BackgroundEffects({
         />
       </div>
     </>
-  )
+  );
 }

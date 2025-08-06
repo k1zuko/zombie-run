@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useRef, useEffect } from "react";
+import { motion, useAnimation } from "framer-motion";
 
 interface ZombieState {
   isAttacking: boolean;
@@ -16,10 +17,10 @@ interface ZombieCharacterProps {
   animationTime: number;
   gameMode: "normal" | "panic";
   centerX: number;
-  chaserType: string; // Prop untuk tipe pengejar
+  chaserType: string;
+  players: Array<{ id: string; nickname: string }>; // Tambahan untuk nama pemain
 }
 
-// Daftar karakter pengejar dengan path gambar dan nama alternatif
 const chaserImages = {
   zombie: {
     src: "/images/zombie.gif",
@@ -27,15 +28,15 @@ const chaserImages = {
   },
   monster1: {
     src: "/images/monster1.gif",
-    alt: "Monster 1",
+    alt: "Mutant Gila",
   },
   monster2: {
     src: "/images/monster2.gif",
-    alt: "Monster 2",
+    alt: "Monster Rawa",
   },
   darknight: {
     src: "/images/darknight.gif",
-    alt: "Dark Knight",
+    alt: "Ksatria Gelap",
   },
 };
 
@@ -45,12 +46,39 @@ export default function ZombieCharacter({
   gameMode,
   centerX,
   chaserType,
+  players,
 }: ZombieCharacterProps) {
   const attackRef = useRef<HTMLDivElement>(null);
+  const controls = useAnimation();
   const ZOMBIE_SPEED = 30;
 
-  // Memilih gambar pengejar berdasarkan chaserType, default ke zombie jika tidak ditemukan
   const selectedChaser = chaserImages[chaserType as keyof typeof chaserImages] || chaserImages.zombie;
+  const targetPlayer = zombieState.isAttacking
+    ? players.find((p) => p.id === zombieState.targetPlayerId)
+    : null;
+
+  // Efek kilatan saat serangan dimulai
+  useEffect(() => {
+    if (zombieState.isAttacking) {
+      controls.start({
+        scale: [1, 1.2, 1],
+        filter: [
+          "brightness(1.4) contrast(1.6) saturate(1.4)",
+          "brightness(1.8) contrast(1.8) saturate(1.6)",
+          "brightness(1.4) contrast(1.6) saturate(1.4)",
+        ],
+        transition: { duration: 0.3, ease: "easeInOut" },
+      });
+    } else {
+      controls.start({
+        scale: 1,
+        filter: gameMode === "panic"
+          ? "brightness(1.3) contrast(1.5) saturate(1.3)"
+          : "brightness(1.1) contrast(1.2)",
+        transition: { duration: 0.2 },
+      });
+    }
+  }, [zombieState.isAttacking, gameMode, controls]);
 
   // Logging untuk debugging
   useEffect(() => {
@@ -58,8 +86,9 @@ export default function ZombieCharacter({
       chaserType,
       selectedChaser: selectedChaser.src,
       isAttacking: zombieState.isAttacking,
+      targetPlayer: targetPlayer?.nickname || "Tidak ada target",
     });
-  }, [chaserType, zombieState.isAttacking, selectedChaser.src]);
+  }, [chaserType, zombieState.isAttacking, selectedChaser.src, targetPlayer]);
 
   const normalMovement = {
     x: Math.sin(animationTime * 0.4) * (gameMode === "panic" ? 140 : 30),
@@ -69,92 +98,111 @@ export default function ZombieCharacter({
   };
 
   const attackMovement = {
-    x: Math.sin(animationTime * 0.8) * 15,
-    y: Math.sin(animationTime * 2.0) * 8,
-    rotation: Math.sin(animationTime * 3) * 10,
-    scale: 2.2,
+    x: Math.sin(animationTime * 1.2) * 25, // Gerakan lebih agresif
+    y: Math.sin(animationTime * 2.5) * 12,
+    rotation: Math.sin(animationTime * 4) * 15,
+    scale: 2.4, // Skala lebih besar untuk efek dramatis
   };
 
   const currentMovement = zombieState.isAttacking ? attackMovement : normalMovement;
 
   return (
-    <div
+    <motion.div
       ref={attackRef}
       className="absolute z-40 origin-bottom"
       style={{
         left: `${centerX - zombieState.currentPosition + currentMovement.x}px`,
-        top: "83%",
+        top: "80%",
         transform: `translateY(${currentMovement.y}px)`,
-        transition: zombieState.isAttacking ? "transform 0.05s linear" : "transform 0.1s ease-out",
       }}
+      animate={controls}
     >
       <div className="relative">
-        {/* Indikator serangan */}
-        {zombieState.isAttacking && (
-          <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 px-3 py-1.5 rounded text-sm bg-red-800/90 text-white animate-pulse border border-red-500 shadow-lg">
-            
-          </div>
+        {/* Indikator serangan dengan nama pemain */}
+        {zombieState.isAttacking && targetPlayer && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute -top-12 left-1/2 transform -translate-x-1/2 px-3 py-1.5 rounded text-sm bg-red-800/90 text-white animate-pulse border border-red-500 shadow-lg"
+          >
+            Menyerang {targetPlayer.nickname}!
+          </motion.div>
         )}
 
         {/* Efek darah saat menyerang */}
         {zombieState.isAttacking && (
-          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-2 h-8 bg-red-600 animate-drip">
-            <div className="absolute bottom-0 w-4 h-4 bg-red-600 rounded-full animate-pulse"></div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-3 h-10 bg-red-600 animate-drip"
+          >
+            <div className="absolute bottom-0 w-5 h-5 bg-red-600 rounded-full animate-pulse"></div>
+          </motion.div>
         )}
 
-        <Image
-          src={selectedChaser.src}
-          alt={selectedChaser.alt}
-          width={140}
-          height={140}
-          className="drop-shadow-lg"
-          unoptimized
-          style={{
-            imageRendering: "pixelated",
-            filter: zombieState.isAttacking
-            ? "brightness(1.4) contrast(1.6) saturate(1.4) drop-shadow(0 0 20px rgba(255,50,50,0.8))"
-            : gameMode === "panic"
-                ? "brightness(1.3) contrast(1.5) saturate(1.3) drop-shadow(0 0 10px rgba(255,50,50,0.5))"
-                : "brightness(1.1) contrast(1.2)",
-            transform: `scale(${currentMovement.scale}) rotate(${currentMovement.rotation}deg)`,
-            transformOrigin: "bottom center",
-            transition: "all 0.1s ease-out",
-          }}
-        />
+        {/* Gambar pengejar */}
+        <motion.div
+          key={chaserType}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Image
+            src={selectedChaser.src}
+            alt={selectedChaser.alt}
+            width={140}
+            height={140}
+            className="drop-shadow-lg"
+            unoptimized
+            style={{
+              imageRendering: "pixelated",
+              transform: `scale(${currentMovement.scale}) rotate(${currentMovement.rotation}deg)`,
+              transformOrigin: "bottom center",
+              transition: "transform 0.1s ease-out",
+            }}
+          />
+        </motion.div>
 
         {/* Jejak pengejar saat menyerang */}
         {zombieState.isAttacking &&
           [...Array(4)].map((_, i) => (
-            <div key={`blood-trail-${i}`} className="absolute top-0 left-0">
+            <motion.div
+              key={`blood-trail-${i}`}
+              initial={{ opacity: 0.4 - i * 0.1, x: 0 }}
+              animate={{ opacity: 0, x: -20 - i * 15 }}
+              transition={{ duration: 0.5, delay: i * 0.1, ease: "easeOut" }}
+              className="absolute top-0 left-0"
+            >
               <Image
                 src={selectedChaser.src}
                 alt={`${selectedChaser.alt} Trail`}
                 width={140}
                 height={140}
-                className="absolute"
                 unoptimized
                 style={{
                   imageRendering: "pixelated",
-                  opacity: 0.35 - i * 0.1,
                   filter: "brightness(0.7) contrast(1.1) hue-rotate(10deg)",
-                  transform: `translateX(${-15 - i * 10}px) scale(${0.95 - i * 0.1})`,
-                  animation: `fadeOut 0.6s ${i * 0.15}s forwards`,
+                  transform: `scale(${0.95 - i * 0.1})`,
                 }}
               />
-          <audio src="/musics/rarrgh.mp3" autoPlay/>
-            </div>
+            </motion.div>
           ))}
 
         {/* Efek aura */}
-        <div
-          className={`absolute -inset-3 rounded-full blur-md ${
+        <motion.div
+          className={`absolute -inset-4 rounded-full blur-lg ${
             zombieState.isAttacking
-              ? "bg-red-600 opacity-25 animate-pulse-slow"
+              ? "bg-red-600 opacity-30 animate-pulse-slow"
               : gameMode === "panic"
-                ? "bg-red-500 opacity-15"
-                : "bg-green-500 opacity-10"
+                ? "bg-red-500 opacity-20"
+                : "bg-green-500 opacity-15"
           }`}
+          animate={{
+            scale: zombieState.isAttacking ? [1, 1.1, 1] : 1,
+            transition: { duration: 0.5, repeat: zombieState.isAttacking ? Infinity : 0 },
+          }}
         />
 
         {/* Indikator kecepatan pengejar */}
@@ -163,8 +211,13 @@ export default function ZombieCharacter({
             zombieState.isAttacking ? "text-red-400 animate-pulse" : "text-gray-400"
           }`}
         >
-          Kecepatan: {ZOMBIE_SPEED}
+          Kecepatan:{ZOMBIE_SPEED}
         </p>
+
+        {/* Efek suara serangan (opsional, uncomment jika file audio tersedia) */}
+        {/* {zombieState.isAttacking && (
+          <audio src="/sounds/zombie-attack.mp3" autoPlay />
+        )} */}
       </div>
 
       <style jsx>{`
@@ -174,16 +227,16 @@ export default function ZombieCharacter({
             opacity: 1;
           }
           50% {
-            height: 8px;
+            height: 10px;
             opacity: 1;
           }
           100% {
-            height: 16px;
+            height: 20px;
             opacity: 0;
           }
         }
         .animate-drip {
-          animation: drip 0.7s infinite;
+          animation: drip 0.5s infinite;
         }
 
         @keyframes pulse {
@@ -196,31 +249,22 @@ export default function ZombieCharacter({
           }
         }
         .animate-pulse {
-          animation: pulse 0.6s infinite;
+          animation: pulse 0.5s infinite;
         }
 
         @keyframes pulse-slow {
           0%,
           100% {
-            opacity: 0.2;
+            opacity: 0.25;
           }
           50% {
-            opacity: 0.3;
+            opacity: 0.35;
           }
         }
         .animate-pulse-slow {
-          animation: pulse-slow 1.8s infinite;
-        }
-
-        @keyframes fadeOut {
-          0% {
-            opacity: 0.35;
-          }
-          100% {
-            opacity: 0;
-          }
+          animation: pulse-slow 1.2s infinite;
         }
       `}</style>
-    </div>
+    </motion.div>
   );
 }
