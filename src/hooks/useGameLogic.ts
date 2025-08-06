@@ -103,40 +103,56 @@ export function useGameLogic({ room, gameState, players, currentPlayer }: GameLo
           try {
             console.log("🩺 Processing health update for wrong answer...")
 
-            // Get or create current health state
-            let healthState = null;
-            const { data: healthState, error: healthError } = await supabase
-              .from("player_health_states")
-              .select("*")
-              .eq("player_id", currentPlayer.id)
-              .eq("room_id", room.id)
-              .single()
+            // Deklarasikan variabel healthState di luar scope agar bisa diubah
+// Inisialisasi dengan nilai null atau undefined
+let healthState = null; 
 
-            if (healthError && healthError.code !== "PGRST116") {
-              console.error("Error fetching health state:", healthError)
-            }
+// 1. Ambil health state yang sudah ada
+const { data, error: healthError } = await supabase
+  .from("player_health_states")
+  .select("*")
+  .eq("player_id", currentPlayer.id)
+  .eq("room_id", room.id)
+  .single();
 
-            // Create health state if it doesn't exist
-            if (!healthState) {
-              console.log("🆕 Creating new health state...")
-              const { data: newHealthState, error: createError } = await supabase
-                .from("player_health_states")
-                .insert({
-                  player_id: currentPlayer.id,
-                  room_id: room.id,
-                  health: 2, // Start with 3, reduce to 2 for first wrong answer
-                  is_being_attacked: true,
-                  last_attack_time: new Date().toISOString(),
-                })
-                .select()
-                .single()
+// 2. Tangani error saat mengambil data
+if (healthError && healthError.code !== "PGRST116") {
+  console.error("Error fetching health state:", healthError);
+  // Tambahkan throw error atau return untuk menghentikan eksekusi
+  throw healthError; 
+}
 
-              if (createError) {
-                console.error("❌ Error creating health state:", createError)
-              } else {
-                healthState = newHealthState
-                console.log("✅ Health state created:", healthState)
-              }
+// 3. Jika health state ditemukan, simpan nilainya
+if (data) {
+  healthState = data;
+  console.log("✅ Existing health state found:", healthState);
+}
+
+// 4. Jika health state tidak ditemukan, buat yang baru
+if (!healthState) {
+  console.log("🆕 Creating new health state...");
+  const { data: newHealthState, error: createError } = await supabase
+    .from("player_health_states")
+    .insert({
+      player_id: currentPlayer.id,
+      room_id: room.id,
+      health: 2, 
+      is_being_attacked: true,
+      last_attack_time: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    console.error("❌ Error creating health state:", createError);
+    // Tambahkan throw error atau return
+    throw createError;
+  }
+  
+  // 5. Setelah berhasil dibuat, simpan nilainya ke variabel healthState
+  healthState = newHealthState;
+  console.log("✅ Health state created:", healthState);
+}
             } else {
               // Update existing health state
               const newHealth = Math.max(0, healthState.health - 1)
