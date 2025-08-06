@@ -910,11 +910,12 @@ export default function HostGamePage() {
     <div
       className="relative w-full h-screen bg-black overflow-hidden"
       style={{
-        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${
-          Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)
-        }px)`,
+        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)
+          }px)`,
       }}
     >
+      <audio src="/musics/zombies.mp3" autoPlay />
+      <audio src="/musics/background-music.mp3" autoPlay loop />
       <AnimatePresence>
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 max-w-[240px] max-h-[400px] overflow-y-auto">
           {Object.entries(playerStates)
