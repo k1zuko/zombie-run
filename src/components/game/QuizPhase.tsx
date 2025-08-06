@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -5,7 +6,6 @@ import { Clock, Skull, Zap, AlertTriangle, CheckCircle, XCircle } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-// import { getQuestionByIndex, getTotalQuestions } from "@/data/horror-questions";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
@@ -218,8 +218,9 @@ export default function QuizPhase({
   };
 
   const checkInactivityPenalty = async () => {
-    if (!room?.id || !currentPlayer?.id || playerHealth <= 0) {
-      console.log("⚠️ Skipping inactivity penalty check: invalid room, player, or player eliminated");
+    if (!room?.id || !currentPlayer?.id || playerHealth <= 0 || isProcessingAnswer) {
+      console.log("⚠️ Skipping inactivity penalty check: invalid room, player, eliminated, or processing answer");
+      setInactivityCountdown(null);
       return;
     }
     try {
@@ -232,6 +233,7 @@ export default function QuizPhase({
 
       if (error) {
         console.error("Gagal memeriksa ketidakaktifan:", error);
+        setInactivityCountdown(null);
         return;
       }
 
@@ -239,8 +241,12 @@ export default function QuizPhase({
       const currentTime = Date.now();
       const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
 
-      if (timeSinceLastAnswer >= 6 && timeSinceLastAnswer < 10) {
-        setInactivityCountdown(Math.ceil(10 - timeSinceLastAnswer));
+      console.log(`🕒 Pemeriksaan ketidakaktifan: timeSinceLastAnswer=${timeSinceLastAnswer}s, speed=${data.speed}`);
+
+      if (timeSinceLastAnswer >= 0 && timeSinceLastAnswer < 10 && data.speed > 20) {
+        const countdown = Math.ceil(10 - timeSinceLastAnswer);
+        console.log(`⏲️ Memulai countdown penalti: ${countdown}s`);
+        setInactivityCountdown(countdown);
       } else if (timeSinceLastAnswer >= 10 && data.speed > 20) {
         const newSpeed = Math.max(20, data.speed - 10);
         console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
@@ -252,10 +258,14 @@ export default function QuizPhase({
         setPlayerSpeed(newSpeed);
         setInactivityCountdown(null);
       } else {
-        setInactivityCountdown(null);
+        if (inactivityCountdown !== null) {
+          console.log("🔄 Menghapus countdown penalti karena pemain aktif atau kecepatan <= 20");
+          setInactivityCountdown(null);
+        }
       }
     } catch (error) {
       console.error("Error di checkInactivityPenalty:", error);
+      setInactivityCountdown(null);
     }
   };
 
@@ -290,16 +300,15 @@ export default function QuizPhase({
   };
 
   useEffect(() => {
-    
     syncHealthAndSpeedFromDatabase();
-    const syncInterval = setInterval(syncHealthAndSpeedFromDatabase, 2000); // Reduced frequency to 2s
+    const syncInterval = setInterval(syncHealthAndSpeedFromDatabase, 2000);
     return () => clearInterval(syncInterval);
   }, [currentPlayer.id, room.id]);
 
   useEffect(() => {
     const penaltyInterval = setInterval(checkInactivityPenalty, 1000);
     return () => clearInterval(penaltyInterval);
-  }, [currentPlayer.id, room.id, playerHealth]);
+  }, [currentPlayer.id, room.id, playerHealth, isProcessingAnswer]);
 
   useEffect(() => {
     setIsClient(true);
@@ -436,12 +445,13 @@ export default function QuizPhase({
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       <div
-        className={`absolute inset-0 transition-all duration-1000 ${dangerLevel === 3
+        className={`absolute inset-0 transition-all duration-1000 ${
+          dangerLevel === 3
             ? "bg-gradient-to-br from-red-900/40 via-black to-red-950/40"
             : dangerLevel === 2
-              ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
-              : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
-          }`}
+            ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
+            : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
+        }`}
         style={{
           opacity: 0.3 + pulseIntensity * 0.4,
           filter: `hue-rotate(${pulseIntensity * 30}deg)`,
@@ -472,10 +482,10 @@ export default function QuizPhase({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-900/90 text-white font-mono text-sm px-4 py-2 rounded-lg shadow-lg border border-red-500/50 animate-pulse"
+            className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-red-900/90 text-white font-mono text-lg px-6 py-3 rounded-lg shadow-lg border border-red-500/50 animate-pulse"
           >
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-5 h-5 text-yellow-300" />
+            <div className="flex items-center space-x-3">
+              <AlertTriangle className="w-6 h-6 text-yellow-300 animate-bounce" />
               <span>Peringatan: Tidak aktif! Penalti kecepatan dalam {inactivityCountdown}s</span>
             </div>
           </motion.div>
@@ -503,8 +513,7 @@ export default function QuizPhase({
             <div className="flex items-center justify-center space-x-4 mb-3">
               <Clock className={`w-6 h-6 ${timeLeft <= 30 ? "text-red-500 animate-pulse" : "text-yellow-500"}`} />
               <span
-                className={`text-2xl font-mono font-bold ${timeLeft <= 30 ? "text-red-500 animate-pulse" : "text-white"
-                  }`}
+                className={`text-2xl font-mono font-bold ${timeLeft <= 30 ? "text-red-500 animate-pulse" : "text-white"}`}
               >
                 {formatTime(timeLeft)}
               </span>
@@ -519,12 +528,13 @@ export default function QuizPhase({
               {[...Array(3)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${i < playerHealth
+                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${
+                    i < playerHealth
                       ? playerHealth <= 1
                         ? "bg-red-500 border-red-400 animate-pulse"
                         : "bg-green-500 border-green-400"
                       : "bg-gray-600 border-gray-500"
-                    }`}
+                  }`}
                 />
               ))}
             </div>
@@ -540,26 +550,8 @@ export default function QuizPhase({
           <div className="p-8 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-purple-500/5" />
             <div className="relative z-10">
-              {/* <div className="flex items-center justify-between mb-4">
-                <span
-                  className={`text-xs font-mono px-2 py-1 rounded ${
-                    currentQuestion.difficulty === "mudah"
-                      ? "bg-green-600"
-                      : currentQuestion.difficulty === "sedang"
-                        ? "bg-yellow-600"
-                        : "bg-red-600"
-                  } text-white`}
-                >
-                  {currentQuestion.difficulty.toUpperCase()}
-                </span>
-                <span className="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-1 rounded">
-                  {currentQuestion.category.replace("-", " ").toUpperCase()}
-                </span>
-              </div> */}
-
-              {currentQuestion.question_type === 'IMAGE' && currentQuestion.image_url && (
+              {currentQuestion.question_type === "IMAGE" && currentQuestion.image_url && (
                 <div className="mb-4 text-center">
-                  {/* Gunakan tag img standar Next.js atau komponen Image */}
                   <img
                     src={currentQuestion.image_url}
                     alt={currentQuestion.question_text}
@@ -579,8 +571,9 @@ export default function QuizPhase({
                     key={index}
                     onClick={() => handleAnswerSelect(option)}
                     disabled={isAnswered || isProcessingAnswer}
-                    className={`${getAnswerButtonClass(option)} p-6 text-left justify-start font-mono text-lg border-2 transition-all duration-300 relative overflow-hidden group ${isProcessingAnswer ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
+                    className={`${getAnswerButtonClass(option)} p-6 text-left justify-start font-mono text-lg border-2 transition-all duration-300 relative overflow-hidden group ${
+                      isProcessingAnswer ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                     <div className="flex items-center space-x-3 relative z-10">
@@ -588,10 +581,10 @@ export default function QuizPhase({
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{option}</span>
-                      {isAnswered && option === currentQuestion.correctAnswer && (
+                      {isAnswered && option === currentQuestion.correct_answer && (
                         <CheckCircle className="w-5 h-5 ml-auto animate-pulse" />
                       )}
-                      {isAnswered && option === selectedAnswer && option !== currentQuestion.correctAnswer && (
+                      {isAnswered && option === selectedAnswer && option !== currentQuestion.correct_answer && (
                         <XCircle className="w-5 h-5 ml-auto animate-pulse" />
                       )}
                     </div>
