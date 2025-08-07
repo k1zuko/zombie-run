@@ -67,19 +67,6 @@ function UnknownPhase({ phase, room, gameState }: { phase: string; room: Transfo
   )
 }
 
-// New GameOverAnimation component
-function GameOverAnimation({ isUnderAttack }: { isUnderAttack: boolean }) {
-  return (
-    <div className={`min-h-screen flex items-center justify-center relative overflow-hidden ${isUnderAttack ? "animate-pulse bg-red-900/20" : ""}`}>
-      <div className="absolute inset-0 bg-gradient-to-br from-red-900/30 via-black to-purple-900/30 opacity-90" />
-      <div className="text-center z-10 p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-xl">
-        <p className="text-red-500 text-4xl font-bold mb-4 animate-bounce">💀 GAME OVER 💀</p>
-        <p className="text-gray-300 text-lg mb-4">You have been captured by the zombies!</p>
-      </div>
-    </div>
-  )
-}
-
 export default function GamePage() {
   const isMountedRef = useRef(true)
   const timeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set())
@@ -107,8 +94,7 @@ export default function GamePage() {
     currentPlayer,
   })
 
-  const { isGameOver, showCaptureAnimation, wrongAnswers, restartGame, setIsGameOver, setShowCaptureAnimation } =
-    gameLogic
+  const { isGameOver, wrongAnswers, restartGame, setIsGameOver } = gameLogic
 
   const [quizState, setQuizState] = useState({
     health: 3,
@@ -119,7 +105,6 @@ export default function GamePage() {
 
   const [playerHealthStates, setPlayerHealthStates] = useState<{ [playerId: string]: PlayerHealthState }>({})
   const [isUnderAttack, setIsUnderAttack] = useState(false)
-  const [attackAnimation, setAttackAnimation] = useState(false)
 
   const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
     if (!isMountedRef.current) return null
@@ -246,7 +231,6 @@ export default function GamePage() {
     console.log("🎬 Starting zombie attack animation!")
     safeSetState(() => {
       setIsUnderAttack(true)
-      setAttackAnimation(true)
     })
 
     if (document.body) {
@@ -257,7 +241,6 @@ export default function GamePage() {
     safeSetTimeout(() => {
       safeSetState(() => {
         setIsUnderAttack(false)
-        setAttackAnimation(false)
       })
 
       if (document.body) {
@@ -336,10 +319,12 @@ export default function GamePage() {
     if (healthState.health <= 0 && !isGameOver) {
       safeSetState(() => {
         setIsGameOver?.(true)
-        setShowCaptureAnimation?.(true)
+        router.push(
+          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${quizState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=true`
+        )
       })
     }
-  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, setShowCaptureAnimation])
+  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, roomCode, nickname, quizState, router])
 
   // Handle game completion and redirect
   useEffect(() => {
@@ -372,14 +357,6 @@ export default function GamePage() {
 
   if (!room || !gameState || error) {
     return <ErrorState onRetry={refetch} error={error || "Unknown error"} />
-  }
-
-  if (isGameOver && showCaptureAnimation && currentPlayer) {
-    return (
-      <GameWrapper>
-        <GameOverAnimation isUnderAttack={attackAnimation} />
-      </GameWrapper>
-    )
   }
 
   const renderGamePhase = () => {
