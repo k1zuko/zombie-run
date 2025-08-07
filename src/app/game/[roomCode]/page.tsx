@@ -9,8 +9,9 @@ import { supabase } from "@/lib/supabase"
 import LoadingScreen from "@/components/game/LoadingScreen"
 import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
+import GameOverScreen from "@/components/game/GameOverScreen"
 
-// Define interfaces
+// Define interfaces (using imported types from useGameData)
 interface PlayerHealthState {
   playerId: string
   health: number
@@ -93,7 +94,8 @@ export default function GamePage() {
     currentPlayer,
   })
 
-  const { isGameOver, wrongAnswers, restartGame, setIsGameOver } = gameLogic
+  const { isGameOver, showCaptureAnimation, wrongAnswers, restartGame, setIsGameOver, setShowCaptureAnimation } =
+    gameLogic
 
   const [quizState, setQuizState] = useState({
     health: 3,
@@ -104,6 +106,7 @@ export default function GamePage() {
 
   const [playerHealthStates, setPlayerHealthStates] = useState<{ [playerId: string]: PlayerHealthState }>({})
   const [isUnderAttack, setIsUnderAttack] = useState(false)
+  const [attackAnimation, setAttackAnimation] = useState(false)
 
   const safeSetTimeout = useCallback((callback: () => void, delay: number) => {
     if (!isMountedRef.current) return null
@@ -230,6 +233,7 @@ export default function GamePage() {
     console.log("🎬 Starting zombie attack animation!")
     safeSetState(() => {
       setIsUnderAttack(true)
+      setAttackAnimation(true)
     })
 
     if (document.body) {
@@ -240,6 +244,7 @@ export default function GamePage() {
     safeSetTimeout(() => {
       safeSetState(() => {
         setIsUnderAttack(false)
+        setAttackAnimation(false)
       })
 
       if (document.body) {
@@ -303,7 +308,7 @@ export default function GamePage() {
     }
   }, [room, currentPlayer, handleHealthStateUpdate, handleAttackEvent])
 
-  // Sync player health with quiz state and handle elimination
+  // Sync player health with quiz state and handle game over
   useEffect(() => {
     if (!isMountedRef.current || !currentPlayer || !playerHealthStates[currentPlayer.id]) return
 
@@ -316,28 +321,21 @@ export default function GamePage() {
     })
 
     if (healthState.health <= 0 && !isGameOver) {
-      console.log("💀 Player eliminated due to zero health")
       safeSetState(() => {
         setIsGameOver?.(true)
-      })
-      saveGameCompletion().then(() => {
-        router.push(
-          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${healthState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=true`
-        )
+        setShowCaptureAnimation?.(true)
       })
     }
-  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, roomCode, nickname, quizState, router, saveGameCompletion])
+  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, setShowCaptureAnimation])
 
   // Handle game completion and redirect
   useEffect(() => {
-    if (gameState?.phase === "finished" && isMountedRef.current && !isGameOver) {
+    if (gameState?.phase === "finished" && isMountedRef.current) {
       saveGameCompletion().then(() => {
-        router.push(
-          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${quizState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=${quizState.health <= 0}`
-        )
+        router.push(`/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}`)
       })
     }
-  }, [gameState?.phase, roomCode, nickname, quizState, saveGameCompletion, router, isGameOver])
+  }, [gameState?.phase, roomCode, nickname, saveGameCompletion, router])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -359,6 +357,18 @@ export default function GamePage() {
 
   if (!room || !gameState || error) {
     return <ErrorState onRetry={refetch} error={error || "Unknown error"} />
+  }
+
+  if (isGameOver && showCaptureAnimation && currentPlayer) {
+    return (
+      <GameWrapper>
+        <div className={`${attackAnimation ? "animate-pulse bg-red-900/20" : ""}`}>
+          <GameOverScreen
+            
+          />
+        </div>
+      </GameWrapper>
+    )
   }
 
   const renderGamePhase = () => {
