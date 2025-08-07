@@ -11,7 +11,7 @@ import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
 import GameOverScreen from "@/components/game/GameOverScreen"
 
-// Define interfaces (using imported types from useGameData)
+// Define interfaces
 interface PlayerHealthState {
   playerId: string
   health: number
@@ -194,7 +194,6 @@ export default function GamePage() {
       if (currentPlayer && healthData.player_id === currentPlayer.id && healthData.is_being_attacked) {
         console.log("💀 I am being attacked by zombie!")
         triggerAttackAnimation()
-
         safeSetState(() => {
           setQuizState((prev) => ({
             ...prev,
@@ -226,20 +225,24 @@ export default function GamePage() {
     [currentPlayer],
   )
 
-  // Trigger attack animation for current player
+  // Trigger enhanced zombie attack animation
   const triggerAttackAnimation = useCallback(() => {
     if (!isMountedRef.current) return
 
-    console.log("🎬 Starting zombie attack animation!")
+    console.log("🎬 Starting enhanced zombie attack animation!")
     safeSetState(() => {
       setIsUnderAttack(true)
       setAttackAnimation(true)
     })
 
     if (document.body) {
-      document.body.style.animation = "shake 0.5s ease-in-out 3"
-      document.body.style.background = "rgba(255, 0, 0, 0.3)"
+      document.body.classList.add("zombie-attack-shake")
+      document.body.style.background = "linear-gradient(0deg, rgba(139,0,0,0.3), rgba(0,0,0,0.9))"
     }
+
+    // Optional: Add sound effect (if supported in your environment)
+    // const audio = new Audio("/sounds/zombie-growl.mp3")
+    // audio.play().catch((err) => console.error("Sound error:", err))
 
     safeSetTimeout(() => {
       safeSetState(() => {
@@ -248,11 +251,11 @@ export default function GamePage() {
       })
 
       if (document.body) {
-        document.body.style.animation = ""
+        document.body.classList.remove("zombie-attack-shake")
         document.body.style.background = ""
       }
       console.log("✅ Zombie attack animation completed")
-    }, 3000)
+    }, 4000)
   }, [safeSetState, safeSetTimeout])
 
   // Setup realtime subscription for player health states and attacks
@@ -345,7 +348,7 @@ export default function GamePage() {
       timeoutsRef.current.clear()
 
       if (document.body) {
-        document.body.style.animation = ""
+        document.body.classList.remove("zombie-attack-shake")
         document.body.style.background = ""
       }
     }
@@ -363,9 +366,7 @@ export default function GamePage() {
     return (
       <GameWrapper>
         <div className={`${attackAnimation ? "animate-pulse bg-red-900/20" : ""}`}>
-          <GameOverScreen
-            
-          />
+          <GameOverScreen />
         </div>
       </GameWrapper>
     )
@@ -414,14 +415,45 @@ export default function GamePage() {
 
       case "quiz":
         return (
-          <div className={`${isUnderAttack ? "animate-pulse bg-red-900/30" : ""} transition-all duration-300`}>
+          <div className={`${isUnderAttack ? "animate-pulse bg-red-900/30" : ""} transition-all duration-300 relative`}>
             {isUnderAttack && (
-              <div className="fixed inset-0 z-50 pointer-events-none">
-                <div className="absolute inset-0 bg-red-500/20 animate-pulse" />
+              <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-red-900/50 to-black/80 animate-pulse" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-6xl font-bold text-red-500 animate-bounce drop-shadow-lg">
-                    💀 ZOMBIE ATTACK! 💀
+                  <div className="text-5xl md:text-7xl font-horror text-red-600 animate-zombie-text drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                    🧟 ZOMBIE ATTACK! 🧟
                   </div>
+                </div>
+                {/* Zombie claw marks */}
+                <div className="absolute inset-0">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute bg-red-600/50 h-2 w-24 rotate-45 animate-claw"
+                      style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        animationDelay: `${Math.random() * 0.8}s`,
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Blood splatter particles */}
+                <div className="absolute inset-0">
+                  {[...Array(15)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute bg-red-700 rounded-full animate-blood-splat"
+                      style={{
+                        width: `${Math.random() * 10 + 5}px`,
+                        height: `${Math.random() * 10 + 5}px`,
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        animationDuration: `${Math.random() * 1 + 0.5}s`,
+                        animationDelay: `${Math.random() * 0.5}s`,
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -450,16 +482,16 @@ export default function GamePage() {
       {renderGamePhase()}
       {isUnderAttack && (
         <>
-          <div className="fixed inset-0 z-40 pointer-events-none border-8 border-red-500 animate-pulse" />
+          <div className="fixed inset-0 z-40 pointer-events-none border-8 border-red-600/50 animate-pulse" />
           <div className="fixed inset-0 z-40 pointer-events-none">
-            {[...Array(10)].map((_, i) => (
+            {[...Array(12)].map((_, i) => (
               <div
                 key={i}
-                className="absolute text-red-500 font-bold text-2xl animate-bounce"
+                className="absolute text-red-500 font-bold text-xl md:text-2xl animate-damage"
                 style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 0.5}s`,
+                  left: `${Math.random() * 90 + 5}%`,
+                  top: `${Math.random() * 90 + 5}%`,
+                  animationDelay: `${Math.random() * 0.6}s`,
                 }}
               >
                 -1 HP
@@ -470,16 +502,46 @@ export default function GamePage() {
       )}
       <style jsx global>{`
         @keyframes shake {
-          0%,
-          100% {
-            transform: translateX(0);
-          }
-          25% {
-            transform: translateX(-5px);
-          }
-          75% {
-            transform: translateX(5px);
-          }
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+          20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+
+        @keyframes zombie-text {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes claw {
+          0% { transform: translateX(0) rotate(45deg); opacity: 0; }
+          50% { transform: translateX(100px) rotate(45deg); opacity: 0.7; }
+          100% { transform: translateX(200px) rotate(45deg); opacity: 0; }
+        }
+
+        @keyframes blood-splat {
+          0% { transform: scale(0); opacity: 0.8; }
+          50% { transform: scale(1); opacity: 0.5; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        @keyframes damage {
+          0% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(-100px); opacity: 0; }
+        }
+
+        .zombie-attack-shake {
+          animation: shake 0.5s ease-in-out 4;
+        }
+
+        .font-horror {
+          font-family: 'Creepster', cursive, sans-serif;
+        }
+
+        /* Preload the font to avoid FOUT */
+        @font-face {
+          font-family: 'Creepster';
+          src: url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
         }
       `}</style>
     </GameWrapper>

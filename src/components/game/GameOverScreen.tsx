@@ -119,10 +119,10 @@ export default function GameOverScreen() {
           className="text-center mb-8"
         >
           <h1 className="text-6xl font-bold text-red-600 font-horror tracking-widest drop-shadow-[0_0_12px_rgba(255,0,0,0.8)] animate-[pulse_2s_ease-in-out_infinite]">
-            YOU HAVE PERISHED
+            Kamu Telah Binasa
           </h1>
           <p className="text-gray-400 font-mono text-lg mt-4 tracking-widest">
-            Redirecting to results in {countdown} seconds...
+           Mengarahkan ke halaman hasil {countdown} detik...
           </p>
         </motion.div>
 
