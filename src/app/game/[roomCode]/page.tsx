@@ -1,4 +1,3 @@
-
 // app/game/[roomCode]/page.tsx
 "use client"
 
@@ -244,7 +243,7 @@ export default function GamePage() {
         setAttackAnimation(false)
       })
       console.log("✅ Zombie attack animation completed")
-    }, 4000)
+    }, 2000) // Changed from 4000 to 2000 to match 2-second animation
   }, [safeSetState, safeSetTimeout])
 
   // Setup realtime subscription for player health states and attacks
@@ -427,4 +426,3 @@ export default function GamePage() {
 
   return <GameWrapper>{renderGamePhase()}</GameWrapper>
 }
- 
