@@ -12,6 +12,7 @@ import LoadingScreen from "@/components/game/LoadingScreen"
 import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
 import GameOverScreen from "@/components/game/GameOverScreen"
+import AttackOverlay from "@/components/game/AttackOverlay"
 
 // Define interfaces
 interface PlayerHealthState {
@@ -237,19 +238,11 @@ export default function GamePage() {
       setAttackAnimation(true)
     })
 
-    if (document.body) {
-      document.body.style.background = "rgba(139, 0, 0, 0.4)" // Slightly redder overlay
-    }
-
     safeSetTimeout(() => {
       safeSetState(() => {
         setIsUnderAttack(false)
         setAttackAnimation(false)
       })
-
-      if (document.body) {
-        document.body.style.background = ""
-      }
       console.log("✅ Zombie attack animation completed")
     }, 4000)
   }, [safeSetState, safeSetTimeout])
@@ -342,10 +335,6 @@ export default function GamePage() {
       isMountedRef.current = false
       timeoutsRef.current.forEach((timeout) => clearTimeout(timeout))
       timeoutsRef.current.clear()
-
-      if (document.body) {
-        document.body.style.background = ""
-      }
     }
   }, [])
 
@@ -363,6 +352,7 @@ export default function GamePage() {
         <div className={`${attackAnimation ? "bg-red-900/20" : ""}`}>
           <GameOverScreen />
         </div>
+        <AttackOverlay isVisible={attackAnimation} />
       </GameWrapper>
     )
   }
@@ -370,16 +360,19 @@ export default function GamePage() {
   const renderGamePhase = () => {
     if (quizState.isResuming && currentPlayer) {
       return (
-        <QuizPhase
-          room={room}
-          gameState={{ ...gameState, phase: "quiz" }}
-          currentPlayer={currentPlayer}
-          players={players}
-          gameLogic={gameLogic}
-          isSoloMode={isSoloMode}
-          wrongAnswers={wrongAnswers}
-          resumeState={quizState}
-        />
+        <>
+          <QuizPhase
+            room={room}
+            gameState={{ ...gameState, phase: "quiz" }}
+            currentPlayer={currentPlayer}
+            players={players}
+            gameLogic={gameLogic}
+            isSoloMode={isSoloMode}
+            wrongAnswers={wrongAnswers}
+            resumeState={quizState}
+          />
+          <AttackOverlay isVisible={isUnderAttack} />
+        </>
       )
     }
 
@@ -410,14 +403,7 @@ export default function GamePage() {
 
       case "quiz":
         return (
-          <div className={`${isUnderAttack ? "bg-red-900/40" : ""} transition-all duration-300 relative`}>
-            {isUnderAttack && (
-              <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
-                <div className="text-2xl md:text-3xl font-horror text-red-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                  Anda Diserang
-                </div>
-              </div>
-            )}
+          <>
             <QuizPhase
               room={room}
               gameState={gameState}
@@ -427,7 +413,8 @@ export default function GamePage() {
               isSoloMode={isSoloMode}
               wrongAnswers={wrongAnswers}
             />
-          </div>
+            <AttackOverlay isVisible={isUnderAttack} />
+          </>
         )
 
       case "finished":
@@ -438,20 +425,6 @@ export default function GamePage() {
     }
   }
 
-  return (
-    <GameWrapper>
-      {renderGamePhase()}
-      <style jsx global>{`
-        .font-horror {
-          font-family: 'Creepster', cursive, sans-serif;
-        }
-
-        /* Preload the font to avoid FOUT */
-        @font-face {
-          font-family: 'Creepster';
-          src: url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
-        }
-      `}</style>
-    </GameWrapper>
-  )
+  return <GameWrapper>{renderGamePhase()}</GameWrapper>
 }
+ 
