@@ -44,46 +44,46 @@ export default function QuizPhase({
 
   const [roomInfo, setRoomInfo] = useState<{ game_start_time: string; duration: number } | null>(null);
 
-useEffect(() => {
-  const fetchRoomInfo = async () => {
-    const { data, error } = await supabase
-      .from("game_rooms")
-      .select("game_start_time, duration")
-      .eq("id", room.id) // pastikan kamu punya `room.id`
-      .single();
+  useEffect(() => {
+    const fetchRoomInfo = async () => {
+      const { data, error } = await supabase
+        .from("game_rooms")
+        .select("game_start_time, duration")
+        .eq("id", room.id) // pastikan kamu punya `room.id`
+        .single();
 
-    if (error) {
-      console.error("❌ Gagal fetch room info:", error.message);
-    } else {
-      setRoomInfo(data);
+      if (error) {
+        console.error("❌ Gagal fetch room info:", error.message);
+      } else {
+        setRoomInfo(data);
+      }
+    };
+
+    if (room?.id) {
+      fetchRoomInfo();
     }
-  };
-
-  if (room?.id) {
-    fetchRoomInfo();
-  }
-}, [room?.id]);
+  }, [room?.id]);
 
   const [timeLeft, setTimeLeft] = useState(0);
   useEffect(() => {
-  if (!roomInfo?.game_start_time || !roomInfo.duration) return;
+    if (!roomInfo?.game_start_time || !roomInfo.duration) return;
 
-  const start = new Date(roomInfo.game_start_time).getTime();
-  const now = Date.now();
-  const elapsed = Math.floor((now - start) / 1000);
-  const remaining = Math.max(0, roomInfo.duration - elapsed);
-
-  setTimeLeft(remaining);
-
-  const interval = setInterval(() => {
+    const start = new Date(roomInfo.game_start_time).getTime();
     const now = Date.now();
-    const newElapsed = Math.floor((now - start) / 1000);
-    const newRemaining = Math.max(0, roomInfo.duration - newElapsed);
-    setTimeLeft(newRemaining);
-  }, 1000);
+    const elapsed = Math.floor((now - start) / 1000);
+    const remaining = Math.max(0, roomInfo.duration - elapsed);
 
-  return () => clearInterval(interval);
-}, [roomInfo]);
+    setTimeLeft(remaining);
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const newElapsed = Math.floor((now - start) / 1000);
+      const newRemaining = Math.max(0, roomInfo.duration - newElapsed);
+      setTimeLeft(newRemaining);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [roomInfo]);
 
 
   const [inactivityCountdown, setInactivityCountdown] = useState<number | null>(null);
@@ -106,6 +106,33 @@ useEffect(() => {
 
   const pulseIntensity = timeLeft <= 30 ? (31 - timeLeft) / 30 : 0;
   const FEEDBACK_DURATION = 1000;
+
+  useEffect(() => {
+    const fetchAnsweredProgress = async () => {
+      if (!room?.id || !currentPlayer?.id) return;
+
+      const { data, error } = await supabase
+        .from("player_answers")
+        .select("question_index, answer, is_correct")
+        .eq("player_id", currentPlayer.id)
+        .eq("room_id", room.id)
+        .order("question_index", { ascending: true });
+
+      if (error) {
+        console.error("Gagal mengambil progress jawaban:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const lastIndex = data[data.length - 1].question_index;
+        setCurrentQuestionIndex(lastIndex + 1); // Mulai dari soal berikutnya
+        setCorrectAnswers(data.filter((d) => d.is_correct).length);
+      }
+    };
+
+    fetchAnsweredProgress();
+  }, [room?.id, currentPlayer?.id]);
+
 
   const getDangerLevel = () => {
     if (playerHealth <= 1) return 3;
@@ -422,6 +449,21 @@ useEffect(() => {
   const handleAnswerSelect = async (answer: string) => {
     if (isAnswered || !currentQuestion || isProcessingAnswer) return;
 
+    // ❗ Cek apakah sudah pernah dijawab soal ini
+    const { data: existing, error } = await supabase
+      .from("player_answers")
+      .select("id")
+      .eq("player_id", currentPlayer.id)
+      .eq("room_id", room.id)
+      .eq("question_index", currentQuestionIndex)
+      .maybeSingle();
+
+    if (existing) {
+      console.log("Sudah pernah dijawab, skip");
+      return;
+    }
+
+    // lanjutkan seperti biasa
     setSelectedAnswer(answer);
     setIsAnswered(true);
 
@@ -431,6 +473,7 @@ useEffect(() => {
       await handleWrongAnswer();
     }
   };
+
 
   const handleCorrectAnswer = async () => {
     if (isProcessingAnswer) return;
@@ -488,13 +531,12 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
       <div
-        className={`absolute inset-0 transition-all duration-1000 ${
-          dangerLevel === 3
+        className={`absolute inset-0 transition-all duration-1000 ${dangerLevel === 3
             ? "bg-gradient-to-br from-red-900/40 via-black to-red-950/40"
             : dangerLevel === 2
-            ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
-            : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
-        }`}
+              ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
+              : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
+          }`}
         style={{
           opacity: 0.3 + pulseIntensity * 0.4,
           filter: `hue-rotate(${pulseIntensity * 30}deg)`,
@@ -571,13 +613,12 @@ useEffect(() => {
               {[...Array(3)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${
-                    i < playerHealth
+                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${i < playerHealth
                       ? playerHealth <= 1
                         ? "bg-red-500 border-red-400 animate-pulse"
                         : "bg-green-500 border-green-400"
                       : "bg-gray-600 border-gray-500"
-                  }`}
+                    }`}
                 />
               ))}
             </div>
@@ -614,9 +655,8 @@ useEffect(() => {
                     key={index}
                     onClick={() => handleAnswerSelect(option)}
                     disabled={isAnswered || isProcessingAnswer}
-                    className={`${getAnswerButtonClass(option)} p-6 text-left justify-start font-mono text-lg border-2 transition-all duration-300 relative overflow-hidden group ${
-                      isProcessingAnswer ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className={`${getAnswerButtonClass(option)} p-6 text-left justify-start font-mono text-lg border-2 transition-all duration-300 relative overflow-hidden group ${isProcessingAnswer ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                     <div className="flex items-center space-x-3 relative z-10">

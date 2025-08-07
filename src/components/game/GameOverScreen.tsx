@@ -26,7 +26,7 @@ export default function GameOverScreen() {
   const total = parseInt(searchParams.get("total") || "10", 10)
   const eliminated = searchParams.get("eliminated") === "true"
 
-  const [countdown, setCountdown] = useState(10)
+  const [countdown, setCountdown] = useState(7)
   const isMountedRef = useRef(true)
 
   const getRandomCharacterGif = () => {
