@@ -97,6 +97,7 @@ export default function ResultsPage() {
   const channelsRef = useRef<any[]>([])
 
   const initializePlayerData = useCallback(() => {
+    console.log("Search params:", Object.fromEntries(searchParams))
     console.log("Initializing player data...");
     try {
       // Use default values if parameters are invalid
