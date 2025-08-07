@@ -136,7 +136,7 @@ export default function QuizPhase({
           return false;
         }
 
-        console.log("Hasil kecepatan dari RPC:", speedResult);
+        console.log("Hasil kecepatan RPC:", speedResult);
 
         if (speedResult) {
           setPlayerSpeed(speedResult.new_speed);
@@ -595,6 +595,7 @@ export default function QuizPhase({
           </div>
         </Card>
       </div>
+
 
       <ZombieFeedback isCorrect={isCorrect} isVisible={showFeedback} />
     </div>
