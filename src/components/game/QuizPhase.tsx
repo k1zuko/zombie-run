@@ -42,7 +42,50 @@ export default function QuizPhase({
   const params = useParams();
   const roomCode = params.roomCode as string;
 
-  const [timeLeft, setTimeLeft] = useState(300);
+  const [roomInfo, setRoomInfo] = useState<{ game_start_time: string; duration: number } | null>(null);
+
+useEffect(() => {
+  const fetchRoomInfo = async () => {
+    const { data, error } = await supabase
+      .from("game_rooms")
+      .select("game_start_time, duration")
+      .eq("id", room.id) // pastikan kamu punya `room.id`
+      .single();
+
+    if (error) {
+      console.error("❌ Gagal fetch room info:", error.message);
+    } else {
+      setRoomInfo(data);
+    }
+  };
+
+  if (room?.id) {
+    fetchRoomInfo();
+  }
+}, [room?.id]);
+
+  const [timeLeft, setTimeLeft] = useState(0);
+  useEffect(() => {
+  if (!roomInfo?.game_start_time || !roomInfo.duration) return;
+
+  const start = new Date(roomInfo.game_start_time).getTime();
+  const now = Date.now();
+  const elapsed = Math.floor((now - start) / 1000);
+  const remaining = Math.max(0, roomInfo.duration - elapsed);
+
+  setTimeLeft(remaining);
+
+  const interval = setInterval(() => {
+    const now = Date.now();
+    const newElapsed = Math.floor((now - start) / 1000);
+    const newRemaining = Math.max(0, roomInfo.duration - newElapsed);
+    setTimeLeft(newRemaining);
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [roomInfo]);
+
+
   const [inactivityCountdown, setInactivityCountdown] = useState<number | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -322,34 +365,34 @@ export default function QuizPhase({
     }
   }, [playerHealth, correctAnswers, currentQuestionIndex]);
 
-  useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
+  // useEffect(() => {
+  //   if (timerRef.current) {
+  //     clearInterval(timerRef.current);
+  //   }
 
-    if (timeLeft > 0 && playerHealth > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            console.log("Waktu habis, mengalihkan ke hasil");
-            setIsAnswered(true);
-            saveGameCompletion(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0).then(() => {
-              redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0);
-            });
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+  //   if (timeLeft > 0 && playerHealth > 0) {
+  //     timerRef.current = setInterval(() => {
+  //       setTimeLeft((prev) => {
+  //         if (prev <= 1) {
+  //           console.log("Waktu habis, mengalihkan ke hasil");
+  //           setIsAnswered(true);
+  //           saveGameCompletion(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0).then(() => {
+  //             redirectToResults(playerHealth, correctAnswers, currentQuestionIndex, playerHealth <= 0);
+  //           });
+  //           return 0;
+  //         }
+  //         return prev - 1;
+  //       });
+  //     }, 1000);
+  //   }
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [timeLeft, playerHealth, correctAnswers, currentQuestionIndex]);
+  //   return () => {
+  //     if (timerRef.current) {
+  //       clearInterval(timerRef.current);
+  //       timerRef.current = null;
+  //     }
+  //   };
+  // }, [timeLeft, playerHealth, correctAnswers, currentQuestionIndex]);
 
   useEffect(() => {
     if (showFeedback) {
