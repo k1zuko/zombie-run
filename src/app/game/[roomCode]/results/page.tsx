@@ -97,197 +97,196 @@ export default function ResultsPage() {
   const channelsRef = useRef<any[]>([])
 
   const initializePlayerData = useCallback(async () => {
-  console.log("Initializing player data with searchParams:", Object.fromEntries(searchParams));
-  try {
-    // Try to get nickname from searchParams as a fallback
-    let nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown");
-    if (!nickname || nickname === "null") {
-      console.warn("Invalid nickname from searchParams, using default");
-      nickname = "Unknown";
-    }
+    console.log("Initializing player data with searchParams:", Object.fromEntries(searchParams));
+    try {
+      // Try to get nickname from searchParams as a fallback
+      let nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown");
+      if (!nickname || nickname === "null") {
+        console.warn("Invalid nickname from searchParams, using default");
+        nickname = "Unknown";
+      }
 
-    // Fetch player data from Supabase
-    if (!roomCode) {
-      console.error("No roomCode available for player data fetch");
-      setError("Kode ruangan tidak valid");
+      // Fetch player data from Supabase
+      if (!roomCode) {
+        console.error("No roomCode available for player data fetch");
+        setError("Kode ruangan tidak valid");
+        setPlayerData({
+          health: 3,
+          correct: 0,
+          total: 10,
+          eliminated: false,
+          perfect: false,
+          nickname: "Unknown",
+        });
+        return;
+      }
+
+      // Fetch room to get room_id
+      const { data: roomData, error: roomError } = await supabase
+        .from("game_rooms")
+        .select("id")
+        .eq("room_code", roomCode)
+        .single();
+
+      if (roomError || !roomData) {
+        console.error("Room fetch error:", roomError?.message);
+        setError(`Ruangan tidak ditemukan: ${roomError?.message || "Ruangan tidak valid"}`);
+        setPlayerData({
+          health: 3,
+          correct: 0,
+          total: 10,
+          eliminated: false,
+          perfect: false,
+          nickname: "Unknown",
+        });
+        return;
+      }
+
+      // Fetch player data from players table
+      const { data: playerDataFromDB, error: playerError } = await supabase
+        .from("players")
+        .select("id, nickname, correct_answers, is_alive")
+        .eq("room_id", roomData.id)
+        .eq("nickname", nickname)
+        .single();
+
+      if (playerError || !playerDataFromDB) {
+        console.warn("Player not found or error:", playerError?.message);
+        setError("Pemain tidak ditemukan, menggunakan nilai default");
+        setPlayerData({
+          health: 3,
+          correct: 0,
+          total: 10,
+          eliminated: false,
+          perfect: false,
+          nickname: "Unknown",
+        });
+        return;
+      }
+
+      // Fetch health data from player_health_states
+      const { data: healthData, error: healthError } = await supabase
+        .from("player_health_states")
+        .select("health, max_health")
+        .eq("player_id", playerDataFromDB.id)
+        .eq("room_id", roomData.id)
+        .single();
+
+      if (healthError || !healthData) {
+        console.warn("Health data not found or error:", healthError?.message);
+        setError("Data kesehatan pemain tidak ditemukan, menggunakan nilai default");
+        setPlayerData({
+          health: 3,
+          correct: playerDataFromDB.correct_answers || 0,
+          total: 10,
+          eliminated: !playerDataFromDB.is_alive,
+          perfect: false,
+          nickname: playerDataFromDB.nickname,
+        });
+        return;
+      }
+
+      // Fetch completion data to get total_questions_answered
+      const { data: completionData, error: completionError } = await supabase
+        .from("game_completions")
+        .select("correct_answers, total_questions_answered, is_eliminated")
+        .eq("player_id", playerDataFromDB.id)
+        .eq("room_id", roomData.id)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      const total = completionData?.total_questions_answered || 10;
+      const correct = completionData?.correct_answers || playerDataFromDB.correct_answers || 0;
+      const eliminated = completionData?.is_eliminated || !playerDataFromDB.is_alive;
+      const perfect = correct === total && total > 0;
+
       setPlayerData({
-        health: 3,
-        correct: 0,
-        total: 10,
-        eliminated: false,
-        perfect: false,
-        nickname: "Unknown",
-      });
-      return;
-    }
-
-    // Fetch room to get room_id
-    const { data: roomData, error: roomError } = await supabase
-      .from("game_rooms")
-      .select("id")
-      .eq("room_code", roomCode)
-      .single();
-
-    if (roomError || !roomData) {
-      console.error("Room fetch error:", roomError?.message);
-      setError(`Ruangan tidak ditemukan: ${roomError?.message || "Ruangan tidak valid"}`);
-      setPlayerData({
-        health: 3,
-        correct: 0,
-        total: 10,
-        eliminated: false,
-        perfect: false,
-        nickname: "Unknown",
-      });
-      return;
-    }
-
-    // Fetch player data from players table
-    const { data: playerDataFromDB, error: playerError } = await supabase
-      .from("players")
-      .select("id, nickname, correct_answers, is_alive")
-      .eq("room_id", roomData.id)
-      .eq("nickname", nickname)
-      .single();
-
-    if (playerError || !playerDataFromDB) {
-      console.warn("Player not found or error:", playerError?.message);
-      setError("Pemain tidak ditemukan, menggunakan nilai default");
-      setPlayerData({
-        health: 3,
-        correct: 0,
-        total: 10,
-        eliminated: false,
-        perfect: false,
-        nickname: "Unknown",
-      });
-      return;
-    }
-
-    // Fetch health data from player_health_states
-    const { data: healthData, error: healthError } = await supabase
-      .from("player_health_states")
-      .select("health, max_health")
-      .eq("player_id", playerDataFromDB.id)
-      .eq("room_id", roomData.id)
-      .single();
-
-    if (healthError || !healthData) {
-      console.warn("Health data not found or error:", healthError?.message);
-      setError("Data kesehatan pemain tidak ditemukan, menggunakan nilai default");
-      setPlayerData({
-        health: 3,
-        correct: playerDataFromDB.correct_answers || 0,
-        total: 10,
-        eliminated: !playerDataFromDB.is_alive,
-        perfect: false,
+        health: healthData.health,
+        correct,
+        total,
+        eliminated,
+        perfect,
         nickname: playerDataFromDB.nickname,
       });
-      return;
+      console.log("Player data set from Supabase:", {
+        health: healthData.health,
+        correct,
+        total,
+        eliminated,
+        perfect,
+        nickname: playerDataFromDB.nickname,
+      });
+    } catch (err: any) {
+      console.error("Error initializing player data from Supabase:", err.message);
+      setError("Gagal memuat data pemain dari database, menggunakan nilai default");
+      setPlayerData({
+        health: 3,
+        correct: 0,
+        total: 10,
+        eliminated: false,
+        perfect: false,
+        nickname: "Unknown",
+      });
     }
-
-    // Fetch completion data to get total_questions_answered
-    const { data: completionData, error: completionError } = await supabase
-      .from("game_completions")
-      .select("correct_answers, total_questions_answered, is_eliminated")
-      .eq("player_id", playerDataFromDB.id)
-      .eq("room_id", roomData.id)
-      .order("completed_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    const total = completionData?.total_questions_answered || 10;
-    const correct = completionData?.correct_answers || playerDataFromDB.correct_answers || 0;
-    const eliminated = completionData?.is_eliminated || !playerDataFromDB.is_alive;
-    const perfect = correct === total && total > 0;
-
-    setPlayerData({
-      health: healthData.health,
-      correct,
-      total,
-      eliminated,
-      perfect,
-      nickname: playerDataFromDB.nickname,
-    });
-    console.log("Player data set from Supabase:", {
-      health: healthData.health,
-      correct,
-      total,
-      eliminated,
-      perfect,
-      nickname: playerDataFromDB.nickname,
-    });
-  } catch (err: any) {
-    console.error("Error initializing player data from Supabase:", err.message);
-    setError("Gagal memuat data pemain dari database, menggunakan nilai default");
-    setPlayerData({
-      health: 3,
-      correct: 0,
-      total: 10,
-      eliminated: false,
-      perfect: false,
-      nickname: "Unknown",
-    });
-  }
-}, [roomCode, searchParams]);
+  }, [roomCode, searchParams]);
 
   const fetchInitialData = useCallback(async () => {
-    console.log("Starting fetchInitialData for roomCode:", roomCode)
+    console.log("Starting fetchInitialData for roomCode:", roomCode);
     if (!roomCode) {
-      console.error("Invalid roomCode")
-      setError("Kode ruangan tidak valid")
-      setIsLoading(false)
-      return
+      console.error("Invalid roomCode");
+      setError("Kode ruangan tidak valid");
+      setIsLoading(false);
+      return;
     }
 
     try {
-      setError(null)
-      console.log("Fetching room data...")
+      setError(null);
 
-      // Initialize player data
-      initializePlayerData()
+      // Initialize player data from Supabase
+      await initializePlayerData();
 
       // Fetch room data to get room_id
       const { data: roomData, error: roomError } = await supabase
         .from("game_rooms")
         .select("*")
         .eq("room_code", roomCode)
-        .single()
+        .single();
 
       if (roomError || !roomData) {
-        console.error("Room fetch error:", roomError?.message)
-        setError(`Ruangan tidak ditemukan: ${roomError?.message || "Ruangan tidak valid"}`)
-        setIsLoading(false)
-        return
+        console.error("Room fetch error:", roomError?.message);
+        setError(`Ruangan tidak ditemukan: ${roomError?.message || "Ruangan tidak valid"}`);
+        setIsLoading(false);
+        return;
       }
 
-      console.log("Room data fetched:", roomData)
-      setRoom(roomData)
+      console.log("Room data fetched:", roomData);
+      setRoom(roomData);
 
       // Fetch other data concurrently
-      console.log("Fetching additional data...")
+      console.log("Fetching additional data...");
       const [
         { data: completionsData, error: completionsError },
         { data: leaderboardData, error: leaderboardError },
         { data: battleStatsData, error: battleStatsError },
-        { data: activityData, error: activityError }
+        { data: activityData, error: activityError },
       ] = await Promise.all([
         supabase
           .from("game_completions")
           .select(`
-            *,
-            players!inner(nickname, character_type)
-          `)
+          *,
+          players!inner(nickname, character_type)
+        `)
           .eq("room_id", roomData.id)
           .order("completed_at", { ascending: false }),
         supabase.rpc("get_room_leaderboard", { p_room_id: roomData.id }),
         supabase.rpc("get_room_battle_stats", { p_room_id: roomData.id }),
-        supabase.rpc("get_recent_game_activity", { p_room_id: roomData.id, p_limit: 10 })
-      ])
+        supabase.rpc("get_recent_game_activity", { p_room_id: roomData.id, p_limit: 10 }),
+      ]);
 
       if (completionsError) {
-        console.warn("Error fetching game completions:", completionsError.message)
-        setGameCompletions([])
+        console.warn("Error fetching game completions:", completionsError.message);
+        setGameCompletions([]);
       } else {
         const formattedCompletions = completionsData.map((completion: any) => ({
           ...completion,
@@ -295,44 +294,44 @@ export default function ResultsPage() {
             nickname: completion.players?.nickname || "Tidak Dikenal",
             character_type: completion.players?.character_type || "default",
           },
-        }))
-        setGameCompletions(formattedCompletions)
-        console.log("Game completions set:", formattedCompletions)
+        }));
+        setGameCompletions(formattedCompletions);
+        console.log("Game completions set:", formattedCompletions);
       }
 
       if (leaderboardError) {
-        console.warn("Error fetching leaderboard:", leaderboardError.message)
-        setPlayerStats([])
+        console.warn("Error fetching leaderboard:", leaderboardError.message);
+        setPlayerStats([]);
       } else if (leaderboardData) {
-        setPlayerStats(leaderboardData)
-        console.log("Player stats set:", leaderboardData)
+        setPlayerStats(leaderboardData);
+        console.log("Player stats set:", leaderboardData);
       }
 
       if (battleStatsError) {
-        console.warn("Error fetching battle stats:", battleStatsError.message)
-        setRoomStats(null)
+        console.warn("Error fetching battle stats:", battleStatsError.message);
+        setRoomStats(null);
       } else {
-        setRoomStats(battleStatsData[0] || null)
-        console.log("Room stats set:", battleStatsData[0])
+        setRoomStats(battleStatsData[0] || null);
+        console.log("Room stats set:", battleStatsData[0]);
       }
 
       if (activityError) {
-        console.warn("Error fetching recent activities:", activityError.message)
-        setRecentActivities([])
+        console.warn("Error fetching recent activities:", activityError.message);
+        setRecentActivities([]);
       } else {
-        setRecentActivities(activityData)
-        console.log("Recent activities set:", activityData)
+        setRecentActivities(activityData);
+        console.log("Recent activities set:", activityData);
       }
     } catch (err: any) {
-      console.error("Fetch initial data error:", err.message)
-      setError(err.message || "Gagal memuat data tambahan, menampilkan hasil parsial")
+      console.error("Fetch initial data error:", err.message);
+      setError(err.message || "Gagal memuat data tambahan, menampilkan hasil parsial");
     } finally {
       if (isMountedRef.current) {
-        console.log("Setting isLoading to false")
-        setIsLoading(false)
+        console.log("Setting isLoading to false");
+        setIsLoading(false);
       }
     }
-  }, [roomCode, initializePlayerData]) // Dependencies: roomCode, initializePlayerData
+  }, [roomCode, initializePlayerData]);
 
   const setupRealtimeSubscriptions = useCallback(() => {
     if (!room || !isMountedRef.current) return () => {}
