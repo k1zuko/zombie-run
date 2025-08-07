@@ -1,3 +1,5 @@
+
+// app/game/[roomCode]/page.tsx
 "use client"
 
 import type React from "react"
@@ -11,6 +13,7 @@ import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
 import GameOverScreen from "@/components/game/GameOverScreen"
 
+// Define interfaces
 interface PlayerHealthState {
   playerId: string
   health: number
@@ -18,10 +21,12 @@ interface PlayerHealthState {
   lastAttackTime: number
 }
 
+// Common wrapper component for game phases
 function GameWrapper({ children }: { children: React.ReactNode }) {
   return <div className="min-h-screen bg-gray-900">{children}</div>
 }
 
+// Error state component
 function ErrorState({ onRetry, error }: { onRetry: () => void; error?: string }) {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center relative overflow-hidden">
@@ -40,6 +45,7 @@ function ErrorState({ onRetry, error }: { onRetry: () => void; error?: string })
   )
 }
 
+// Unknown phase component
 function UnknownPhase({ phase, room, gameState }: { phase: string; room: TransformedRoom; gameState: TransformedGameState }) {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center relative overflow-hidden">
@@ -123,6 +129,7 @@ export default function GamePage() {
     }
   }, [])
 
+  // Save game completion to Supabase
   const saveGameCompletion = useCallback(async () => {
     if (!currentPlayer || !room || !isMountedRef.current) return
 
@@ -139,12 +146,15 @@ export default function GamePage() {
 
       if (error) {
         console.error("Failed to save game completion:", error)
+      } else {
+        console.log("Game completion saved for player:", currentPlayer.nickname)
       }
     } catch (err) {
       console.error("Error saving game completion:", err)
     }
   }, [currentPlayer, room, quizState])
 
+  // Handle resume from minigame
   useEffect(() => {
     if (resumeFromMinigame && isMountedRef.current) {
       setQuizState({
@@ -163,11 +173,14 @@ export default function GamePage() {
     }
   }, [resumeFromMinigame, resumeHealth, resumeCorrect, resumeCurrentIndex])
 
+  // Handle health state updates from host
   const handleHealthStateUpdate = useCallback(
     (payload: any) => {
       if (!isMountedRef.current || !payload.new) return
 
       const healthData = payload.new
+      console.log("🩺 Received health update from host:", healthData)
+
       safeSetState(() => {
         setPlayerHealthStates((prev) => ({
           ...prev,
@@ -181,6 +194,7 @@ export default function GamePage() {
       })
 
       if (currentPlayer && healthData.player_id === currentPlayer.id && healthData.is_being_attacked) {
+        console.log("💀 I am being attacked by zombie!")
         triggerAttackAnimation()
         safeSetState(() => {
           setQuizState((prev) => ({
@@ -193,42 +207,38 @@ export default function GamePage() {
     [currentPlayer, safeSetState],
   )
 
+  // Handle attack events
   const handleAttackEvent = useCallback(
     (payload: any) => {
       if (!isMountedRef.current || !payload.new || !currentPlayer) return
 
       const attackData = payload.new
+      console.log("⚔️ Attack event received:", attackData)
+
       if (attackData.target_player_id === currentPlayer.id) {
+        console.log("💀 Zombie attack confirmed for me!")
         triggerAttackAnimation()
+
+        if (attackData.attack_data?.player_nickname) {
+          console.log(`🧟 ${attackData.attack_data.player_nickname} was attacked for wrong answer!`)
+        }
       }
     },
     [currentPlayer],
   )
 
+  // Trigger minimal zombie attack animation
   const triggerAttackAnimation = useCallback(() => {
     if (!isMountedRef.current) return
 
+    console.log("🎬 Starting minimal zombie attack animation!")
     safeSetState(() => {
       setIsUnderAttack(true)
       setAttackAnimation(true)
     })
 
     if (document.body) {
-      document.body.classList.add("zombie-attack-shake")
-      document.body.style.background = "linear-gradient(0deg, rgba(139,0,0,0.5), rgba(0,0,0,0.95))"
-      
-      const overlay = document.createElement('div')
-      overlay.id = 'zombie-attack-overlay'
-      overlay.style.position = 'fixed'
-      overlay.style.top = '0'
-      overlay.style.left = '0'
-      overlay.style.width = '100%'
-      overlay.style.height = '100%'
-      overlay.style.backgroundColor = 'rgba(0,0,0,0.7)'
-      overlay.style.zIndex = '9998'
-      overlay.style.pointerEvents = 'none'
-      overlay.style.animation = 'flicker 0.3s infinite alternate'
-      document.body.appendChild(overlay)
+      document.body.style.background = "rgba(139, 0, 0, 0.4)" // Slightly redder overlay
     }
 
     safeSetTimeout(() => {
@@ -238,16 +248,17 @@ export default function GamePage() {
       })
 
       if (document.body) {
-        document.body.classList.remove("zombie-attack-shake")
         document.body.style.background = ""
-        const overlay = document.getElementById('zombie-attack-overlay')
-        if (overlay) overlay.remove()
       }
-    }, 3500)
+      console.log("✅ Zombie attack animation completed")
+    }, 4000)
   }, [safeSetState, safeSetTimeout])
 
+  // Setup realtime subscription for player health states and attacks
   useEffect(() => {
     if (!room || !currentPlayer || !isMountedRef.current) return
+
+    console.log(`🔗 Setting up player health sync for room ${room.id}`)
 
     const healthChannel = supabase
       .channel(`health-${room.id}`)
@@ -261,7 +272,13 @@ export default function GamePage() {
         },
         handleHealthStateUpdate,
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log(`✅ Health channel subscribed for room ${room.id}`)
+        } else {
+          console.error(`❌ Health channel subscription status: ${status}`)
+        }
+      })
 
     const attackChannel = supabase
       .channel(`attacks-${room.id}`)
@@ -275,14 +292,22 @@ export default function GamePage() {
         },
         handleAttackEvent,
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log(`✅ Attack channel subscribed for room ${room.id}`)
+        } else {
+          console.error(`❌ Attack channel subscription status: ${status}`)
+        }
+      })
 
     return () => {
+      console.log("🔌 Cleaning up health subscriptions")
       supabase.removeChannel(healthChannel)
       supabase.removeChannel(attackChannel)
     }
   }, [room, currentPlayer, handleHealthStateUpdate, handleAttackEvent])
 
+  // Sync player health with quiz state and handle game over
   useEffect(() => {
     if (!isMountedRef.current || !currentPlayer || !playerHealthStates[currentPlayer.id]) return
 
@@ -302,6 +327,7 @@ export default function GamePage() {
     }
   }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, setShowCaptureAnimation])
 
+  // Handle game completion and redirect
   useEffect(() => {
     if (gameState?.phase === "finished" && isMountedRef.current) {
       saveGameCompletion().then(() => {
@@ -310,6 +336,7 @@ export default function GamePage() {
     }
   }, [gameState?.phase, roomCode, nickname, saveGameCompletion, router])
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false
@@ -317,10 +344,7 @@ export default function GamePage() {
       timeoutsRef.current.clear()
 
       if (document.body) {
-        document.body.classList.remove("zombie-attack-shake")
         document.body.style.background = ""
-        const overlay = document.getElementById('zombie-attack-overlay')
-        if (overlay) overlay.remove()
       }
     }
   }, [])
@@ -336,7 +360,7 @@ export default function GamePage() {
   if (isGameOver && showCaptureAnimation && currentPlayer) {
     return (
       <GameWrapper>
-        <div className={`${attackAnimation ? "animate-pulse bg-red-900/20" : ""}`}>
+        <div className={`${attackAnimation ? "bg-red-900/20" : ""}`}>
           <GameOverScreen />
         </div>
       </GameWrapper>
@@ -376,6 +400,8 @@ export default function GamePage() {
       )
     }
 
+    console.log("Rendering phase:", gameState.phase)
+
     switch (gameState.phase) {
       case "lobby":
         return (
@@ -384,66 +410,11 @@ export default function GamePage() {
 
       case "quiz":
         return (
-          <div className={`${isUnderAttack ? "zombie-attack-mode" : ""} transition-all duration-300 relative`}>
+          <div className={`${isUnderAttack ? "bg-red-900/40" : ""} transition-all duration-300 relative`}>
             {isUnderAttack && (
-              <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
-                <div className="absolute inset-0 bg-radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.8) 70%)" />
-                <div className="absolute inset-0 bg-red-900/40 animate-pulse" style={{ animationDuration: '0.8s' }} />
-                
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-5xl md:text-7xl font-horror text-red-600 animate-zombie-text drop-shadow-[0_2px_10px_rgba(255,0,0,0.8)] tracking-wider">
-                    ZOMBIE ATTACK!
-                  </div>
-                </div>
-                
-                <div className="absolute inset-0 flex items-center justify-center animate-zombie-face">
-                  <div className="text-9xl opacity-80">🧟</div>
-                </div>
-                
-                <div className="absolute inset-0">
-                  {[...Array(8)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="absolute h-2 w-32 rotate-[30deg] bg-claw-mark animate-claw"
-                      style={{
-                        left: `${Math.random() * 100}%`,
-                        top: `${Math.random() * 100}%`,
-                        animationDelay: `${Math.random() * 0.5}s`,
-                        backgroundImage: 'linear-gradient(to right, transparent, rgba(200,0,0,0.8), transparent)',
-                        boxShadow: '0 0 10px rgba(200,0,0,0.8)',
-                      }}
-                    />
-                  ))}
-                </div>
-                
-                <div className="absolute inset-0">
-                  {[...Array(30)].map((_, i) => {
-                    const size = Math.random() * 15 + 5
-                    return (
-                      <div
-                        key={i}
-                        className="absolute rounded-full animate-blood-splat"
-                        style={{
-                          width: `${size}px`,
-                          height: `${size}px`,
-                          left: `${Math.random() * 100}%`,
-                          top: `${Math.random() * 100}%`,
-                          backgroundColor: `rgba(150, 0, 0, ${Math.random() * 0.7 + 0.3})`,
-                          animationDuration: `${Math.random() * 1 + 0.5}s`,
-                          animationDelay: `${Math.random() * 0.5}s`,
-                          filter: 'blur(1px)',
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-                
-                <div className="absolute inset-0">
-                  <div className="absolute inset-0 border-4 border-transparent border-opacity-20 animate-crack" 
-                    style={{
-                      borderImage: 'linear-gradient(to bottom right, rgba(255,255,255,0.1), rgba(255,0,0,0.3)) 1',
-                      boxShadow: 'inset 0 0 30px rgba(255,0,0,0.3)'
-                    }} />
+              <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
+                <div className="text-2xl md:text-3xl font-horror text-red-600 drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                  Anda Diserang
                 </div>
               </div>
             )}
@@ -460,7 +431,7 @@ export default function GamePage() {
         )
 
       case "finished":
-        return null
+        return null // Handled by useEffect redirect
 
       default:
         return <UnknownPhase phase={gameState.phase} room={room} gameState={gameState} />
@@ -470,100 +441,12 @@ export default function GamePage() {
   return (
     <GameWrapper>
       {renderGamePhase()}
-      {isUnderAttack && (
-        <>
-          <div className="fixed inset-0 z-40 pointer-events-none border-8 border-red-600/50 animate-pulse" />
-          <div className="fixed inset-0 z-40 pointer-events-none">
-            {[...Array(12)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute text-red-500 font-bold text-xl md:text-2xl animate-damage"
-                style={{
-                  left: `${Math.random() * 90 + 5}%`,
-                  top: `${Math.random() * 90 + 5}%`,
-                  animationDelay: `${Math.random() * 0.6}s`,
-                }}
-              >
-                -1 HP
-              </div>
-            ))}
-          </div>
-        </>
-      )}
       <style jsx global>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px) rotate(-1deg); }
-          20%, 40%, 60%, 80% { transform: translateX(5px) rotate(1deg); }
-        }
-
-        @keyframes flicker {
-          0%, 100% { opacity: 0.7; }
-          50% { opacity: 0.9; }
-        }
-
-        @keyframes zombie-text {
-          0% { transform: scale(1) translateY(0); opacity: 1; text-shadow: 0 0 10px rgba(255,0,0,0.8); }
-          25% { transform: scale(1.05) translateY(-5px); }
-          50% { transform: scale(1.1) translateY(0); opacity: 0.9; text-shadow: 0 0 20px rgba(255,0,0,1); }
-          75% { transform: scale(1.05) translateY(5px); }
-          100% { transform: scale(1) translateY(0); opacity: 1; text-shadow: 0 0 10px rgba(255,0,0,0.8); }
-        }
-
-        @keyframes zombie-face {
-          0% { transform: scale(0.5); opacity: 0; }
-          10% { transform: scale(1.2); opacity: 0.8; }
-          20% { transform: scale(1); opacity: 1; }
-          30% { transform: scale(1.1); opacity: 0.9; }
-          40% { transform: scale(1); opacity: 1; }
-          50% { opacity: 0.8; }
-          60% { opacity: 1; }
-          70% { opacity: 0.9; }
-          80% { transform: scale(1); opacity: 0.7; }
-          90% { transform: scale(0.9); opacity: 0.5; }
-          100% { transform: scale(0.5); opacity: 0; }
-        }
-
-        @keyframes claw {
-          0% { transform: translateX(-50px) rotate(30deg); opacity: 0; }
-          20% { transform: translateX(0) rotate(30deg); opacity: 0.8; }
-          40% { transform: translateX(50px) rotate(30deg); opacity: 0.9; }
-          60% { transform: translateX(100px) rotate(30deg); opacity: 0.7; }
-          80% { transform: translateX(150px) rotate(30deg); opacity: 0.5; }
-          100% { transform: translateX(200px) rotate(30deg); opacity: 0; }
-        }
-
-        @keyframes blood-splat {
-          0% { transform: scale(0) rotate(0deg); opacity: 0; }
-          50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
-          100% { transform: scale(1) rotate(360deg); opacity: 0; }
-        }
-
-        @keyframes crack {
-          0% { transform: scale(1); opacity: 0; }
-          50% { transform: scale(1.02); opacity: 1; }
-          100% { transform: scale(1); opacity: 0; }
-        }
-
-        @keyframes damage {
-          0% { transform: translateY(0) scale(1); opacity: 1; }
-          50% { transform: translateY(-50px) scale(1.2); opacity: 0.8; }
-          100% { transform: translateY(-100px) scale(1); opacity: 0; }
-        }
-
-        .zombie-attack-shake {
-          animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) infinite;
-        }
-
-        .zombie-attack-mode {
-          filter: brightness(0.8) contrast(1.2);
-        }
-
         .font-horror {
           font-family: 'Creepster', cursive, sans-serif;
-          letter-spacing: 2px;
         }
 
+        /* Preload the font to avoid FOUT */
         @font-face {
           font-family: 'Creepster';
           src: url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
