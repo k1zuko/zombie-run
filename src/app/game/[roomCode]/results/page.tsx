@@ -96,66 +96,140 @@ export default function ResultsPage() {
   const isMountedRef = useRef(true)
   const channelsRef = useRef<any[]>([])
 
-  const initializePlayerData = useCallback(() => {
-    console.log("Search params:", Object.fromEntries(searchParams))
-    console.log("Initializing player data...");
-    try {
-      // Use default values if parameters are invalid
-      const health = parseInt(searchParams.get("health") || "3")
-      const correct = parseInt(searchParams.get("correct") || "0")
-      const total = parseInt(searchParams.get("total") || "10")
-      const eliminated = searchParams.get("eliminated") === "true"
-      let nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown")
+  const initializePlayerData = useCallback(async () => {
+  console.log("Initializing player data with searchParams:", Object.fromEntries(searchParams));
+  try {
+    // Try to get nickname from searchParams as a fallback
+    let nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown");
+    if (!nickname || nickname === "null") {
+      console.warn("Invalid nickname from searchParams, using default");
+      nickname = "Unknown";
+    }
 
-      // Validate parameters
-      if (isNaN(health) || isNaN(correct) || isNaN(total)) {
-        console.warn("Invalid URL parameters: using fallback values", {
-          health: searchParams.get("health"),
-          correct: searchParams.get("correct"),
-          total: searchParams.get("total"),
-        })
-        setError("Parameter URL tidak valid, menggunakan nilai default")
-        setPlayerData({
-          health: 3,
-          correct: 0,
-          total: 10,
-          eliminated: false,
-          perfect: false,
-          nickname: "Unknown"
-        })
-        return
-      }
-
-      // Validate nickname
-      if (!nickname || nickname === "null") {
-        console.warn("Invalid nickname, using default")
-        nickname = "Unknown"
-      }
-
-      const perfect = correct === total && total > 0
-
-      setPlayerData({
-        health,
-        correct,
-        total,
-        eliminated,
-        perfect,
-        nickname
-      })
-      console.log("Player data set:", { health, correct, total, eliminated, perfect, nickname })
-    } catch (err: any) {
-      console.error("Error initializing player data:", err.message)
-      setError("Gagal memuat data pemain dari URL, menggunakan nilai default")
+    // Fetch player data from Supabase
+    if (!roomCode) {
+      console.error("No roomCode available for player data fetch");
+      setError("Kode ruangan tidak valid");
       setPlayerData({
         health: 3,
         correct: 0,
         total: 10,
         eliminated: false,
         perfect: false,
-        nickname: "Unknown"
-      })
+        nickname: "Unknown",
+      });
+      return;
     }
-  }, [searchParams]) // Dependency: searchParams
+
+    // Fetch room to get room_id
+    const { data: roomData, error: roomError } = await supabase
+      .from("game_rooms")
+      .select("id")
+      .eq("room_code", roomCode)
+      .single();
+
+    if (roomError || !roomData) {
+      console.error("Room fetch error:", roomError?.message);
+      setError(`Ruangan tidak ditemukan: ${roomError?.message || "Ruangan tidak valid"}`);
+      setPlayerData({
+        health: 3,
+        correct: 0,
+        total: 10,
+        eliminated: false,
+        perfect: false,
+        nickname: "Unknown",
+      });
+      return;
+    }
+
+    // Fetch player data from players table
+    const { data: playerDataFromDB, error: playerError } = await supabase
+      .from("players")
+      .select("id, nickname, correct_answers, is_alive")
+      .eq("room_id", roomData.id)
+      .eq("nickname", nickname)
+      .single();
+
+    if (playerError || !playerDataFromDB) {
+      console.warn("Player not found or error:", playerError?.message);
+      setError("Pemain tidak ditemukan, menggunakan nilai default");
+      setPlayerData({
+        health: 3,
+        correct: 0,
+        total: 10,
+        eliminated: false,
+        perfect: false,
+        nickname: "Unknown",
+      });
+      return;
+    }
+
+    // Fetch health data from player_health_states
+    const { data: healthData, error: healthError } = await supabase
+      .from("player_health_states")
+      .select("health, max_health")
+      .eq("player_id", playerDataFromDB.id)
+      .eq("room_id", roomData.id)
+      .single();
+
+    if (healthError || !healthData) {
+      console.warn("Health data not found or error:", healthError?.message);
+      setError("Data kesehatan pemain tidak ditemukan, menggunakan nilai default");
+      setPlayerData({
+        health: 3,
+        correct: playerDataFromDB.correct_answers || 0,
+        total: 10,
+        eliminated: !playerDataFromDB.is_alive,
+        perfect: false,
+        nickname: playerDataFromDB.nickname,
+      });
+      return;
+    }
+
+    // Fetch completion data to get total_questions_answered
+    const { data: completionData, error: completionError } = await supabase
+      .from("game_completions")
+      .select("correct_answers, total_questions_answered, is_eliminated")
+      .eq("player_id", playerDataFromDB.id)
+      .eq("room_id", roomData.id)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    const total = completionData?.total_questions_answered || 10;
+    const correct = completionData?.correct_answers || playerDataFromDB.correct_answers || 0;
+    const eliminated = completionData?.is_eliminated || !playerDataFromDB.is_alive;
+    const perfect = correct === total && total > 0;
+
+    setPlayerData({
+      health: healthData.health,
+      correct,
+      total,
+      eliminated,
+      perfect,
+      nickname: playerDataFromDB.nickname,
+    });
+    console.log("Player data set from Supabase:", {
+      health: healthData.health,
+      correct,
+      total,
+      eliminated,
+      perfect,
+      nickname: playerDataFromDB.nickname,
+    });
+  } catch (err: any) {
+    console.error("Error initializing player data from Supabase:", err.message);
+    setError("Gagal memuat data pemain dari database, menggunakan nilai default");
+    setPlayerData({
+      health: 3,
+      correct: 0,
+      total: 10,
+      eliminated: false,
+      perfect: false,
+      nickname: "Unknown",
+    });
+  }
+}, [roomCode, searchParams]);
 
   const fetchInitialData = useCallback(async () => {
     console.log("Starting fetchInitialData for roomCode:", roomCode)
