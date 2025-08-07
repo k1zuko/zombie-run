@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -75,46 +76,16 @@ interface GameCompletion {
 }
 
 const characterGifs = [
-  {
-    src: "/images/character.gif",
-    fallback: "/character/character.gif",
-    rootFallback: "/character.gif",
-    alt: "Karakter Hijau",
-    color: "bg-green-500",
-    type: "robot1",
-  },
-  {
-    src: "/images/character1.gif",
-    fallback: "/character/character1.gif",
-    rootFallback: "/character1.gif",
-    alt: "Karakter Biru",
-    color: "bg-blue-500",
-    type: "robot2",
-  },
-  {
-    src: "/images/character2.gif",
-    fallback: "/character/character2.gif",
-    rootFallback: "/character2.gif",
-    alt: "Karakter Merah",
-    color: "bg-red-500",
-    type: "robot3",
-  },
-  {
-    src: "/images/character3.gif",
-    fallback: "/character/character3.gif",
-    rootFallback: "/character3.gif",
-    alt: "Karakter Ungu",
-    color: "bg-purple-500",
-    type: "robot4",
-  },
-  {
-    src: "/images/character4.gif",
-    fallback: "/character/character4.gif",
-    rootFallback: "/character4.gif",
-    alt: "Karakter Oranye",
-    color: "bg-orange-500",
-    type: "robot5",
-  },
+  { src: "/character/character.gif", alt: "Karakter Hijau", color: "bg-green-500", type: "robot1", name: "Hijau" },
+  { src: "/character/character1.gif", alt: "Karakter Biru", color: "bg-blue-500", type: "robot2", name: "Biru" },
+  { src: "/character/character2.gif", alt: "Karakter Merah", color: "bg-red-500", type: "robot3", name: "Merah" },
+  { src: "/character/character3.gif", alt: "Karakter Ungu", color: "bg-purple-500", type: "robot4", name: "Ungu" },
+  { src: "/character/character4.gif", alt: "Karakter Oranye", color: "bg-orange-500", type: "robot5", name: "Oranye" },
+  { src: "/character/character5.gif", alt: "Karakter Kuning", color: "bg-yellow-500", type: "robot6", name: "Kuning" },
+  { src: "/character/character6.gif", alt: "Karakter Abu-abu", color: "bg-gray-500", type: "robot7", name: "Abu-abu" },
+  { src: "/character/character7.gif", alt: "Karakter Pink", color: "bg-pink-500", type: "robot8", name: "Pink" },
+  { src: "/character/character8.gif", alt: "Karakter Cokelat", color: "bg-brown-500", type: "robot9", name: "Cokelat" },
+  { src: "/character/character9.gif", alt: "Karakter Emas", color: "bg-yellow-600", type: "robot10", name: "Emas" },
 ];
 
 export default function HostGamePage() {
@@ -587,6 +558,7 @@ export default function HostGamePage() {
     const healthChannel = supabase.channel(`health-${gameRoom.id}`);
     const answerChannel = supabase.channel(`answers-${gameRoom.id}`);
     const completionChannel = supabase.channel(`completions-${gameRoom.id}`);
+    const playerChannel = supabase.channel(`players-${gameRoom.id}`);
 
     roomChannel
       .on(
@@ -687,12 +659,29 @@ export default function HostGamePage() {
         console.log(`Status langganan completions: ${status}`);
       });
 
+    playerChannel
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "players", filter: `room_id=eq.${gameRoom.id}` },
+        (payload) => {
+          console.log("Perubahan pemain terdeteksi:", payload);
+          const updatedPlayer = payload.new as Player;
+          setPlayers((prev) =>
+            prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p))
+          );
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Status langganan players: ${status}`);
+      });
+
     return () => {
       console.log("Berhenti berlangganan dari channel");
       supabase.removeChannel(roomChannel);
       supabase.removeChannel(healthChannel);
       supabase.removeChannel(answerChannel);
       supabase.removeChannel(completionChannel);
+      supabase.removeChannel(playerChannel);
     };
   }, [gameRoom, handleCorrectAnswer, players, router, roomCode]);
 
@@ -715,18 +704,8 @@ export default function HostGamePage() {
       console.log("Memeriksa pemuatan gambar");
       const status: { [key: string]: boolean } = {};
       for (const character of characterGifs) {
-        const primaryWorks = await testImageLoad(character.src);
-        if (primaryWorks) {
-          status[character.src] = true;
-          continue;
-        }
-        const fallbackWorks = await testImageLoad(character.fallback);
-        if (fallbackWorks) {
-          status[character.fallback] = true;
-          continue;
-        }
-        const rootFallbackWorks = await testImageLoad(character.rootFallback);
-        status[character.rootFallback] = rootFallbackWorks;
+        const works = await testImageLoad(character.src);
+        status[character.src] = works;
       }
       const chaserFiles = [
         "/images/zombie.gif",
@@ -793,10 +772,7 @@ export default function HostGamePage() {
   };
 
   const getWorkingImagePath = (character: (typeof characterGifs)[0]) => {
-    if (imageLoadStatus[character.src]) return character.src;
-    if (imageLoadStatus[character.fallback]) return character.fallback;
-    if (imageLoadStatus[character.rootFallback]) return character.rootFallback;
-    return character.src;
+    return imageLoadStatus[character.src] ? character.src : characterGifs[0].src;
   };
 
   if (!isClient || isLoading) {
@@ -821,7 +797,7 @@ export default function HostGamePage() {
       <audio src="/musics/zombies.mp3" autoPlay />
       <audio src="/musics/background-music.mp3" autoPlay loop />
       <AnimatePresence>
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 max-w-[240px] max-h-[400px] overflow-y-auto">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 max-w-[240px] max-h-[400px] overflow-y-auto custom-scrollbar">
           {Object.entries(playerStates)
             .filter(([_, state]) => state.countdown !== undefined && state.countdown > 0)
             .slice(0, 10)
@@ -910,7 +886,7 @@ export default function HostGamePage() {
               initial={{ scale: 0.8, y: 50 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.8, y: 50 }}
-              className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center"
+              className="bg-gray-900/90 border border-red-900/50 rounded-lg p-8 max-w-md w-full text-center max-h-[80vh] overflow-y-auto custom-scrollbar"
               onClick={(e) => e.stopPropagation()}
             >
               <div id="completion-dialog-description" className="sr-only">
@@ -953,6 +929,31 @@ export default function HostGamePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 12px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(26, 0, 0, 0.8);
+          border-left: 2px solid rgba(255, 0, 0, 0.3);
+          box-shadow: inset 0 0 6px rgba(255, 0, 0, 0.2);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #8b0000, #ff0000);
+          border-radius: 6px;
+          border: 2px solid rgba(255, 0, 0, 0.5);
+          box-shadow: 0 0 8px rgba(255, 0, 0, 0.7);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #ff0000, #8b0000);
+          box-shadow: 0 0 12px rgba(255, 0, 0, 0.9);
+        }
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #ff0000 rgba(26, 0, 0, 0.8);
+        }
+      `}</style>
     </div>
   );
 }

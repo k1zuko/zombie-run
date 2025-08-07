@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -26,7 +27,7 @@ interface GameRoom {
   questions: any[] | null;
   created_at: string;
   updated_at: string;
-  chaser_type: "zombie" | "monster1" | "monster2" | "darknight";
+  chaser_type: "zombie" | "monster1" | "monster2" | "monster3" | "darknight";
 }
 
 const chaserOptions = [
@@ -47,6 +48,12 @@ const chaserOptions = [
     name: "Anjing Neraka",
     gif: "/images/monster2.gif",
     alt: "Anjing Neraka Pengejar",
+  },
+  {
+    value: "monster3" as const,
+    name: "Samurai Pembantai",
+    gif: "/images/monster3.gif",
+    alt: "Samurai Gila Pengejar",
   },
   {
     value: "darknight" as const,
@@ -71,7 +78,7 @@ export default function HostPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [gameDuration, setGameDuration] = useState<string>("600");
   const [questionCount, setQuestionCount] = useState<string>("20");
-  const [chaserType, setChaserType] = useState<"zombie" | "monster1" | "monster2" | "darknight">("zombie");
+  const [chaserType, setChaserType] = useState<"zombie" | "monster1" | "monster2" | "monster3" | "darknight">("zombie");
 
   const TOTAL_QUESTIONS_AVAILABLE = 50;
 
@@ -653,7 +660,7 @@ export default function HostPage() {
                   <Label className="text-white mb-4 block font-medium text-lg">
                     Karakter Pengejar
                   </Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
                     {chaserOptions.map((chaser) => (
                       <div
                         key={chaser.value}
@@ -664,11 +671,11 @@ export default function HostPage() {
                           console.log(`Selected chaser: ${chaser.name} (${chaser.value})`);
                         }}
                         onKeyDown={(e) => e.key === "Enter" && setChaserType(chaser.value)}
-                        className={`relative flex flex-col items-center p-4 rounded-lg cursor-pointer transition-all duration-300
+                        className={`relative flex flex-col items-center p-3 rounded-lg cursor-pointer transition-all duration-300
                           ${chaserType === chaser.value ? 'border-2 border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.7)] bg-red-900/30' : 'border border-white/20 bg-white/10 hover:bg-red-500/20 hover:shadow-[0_0_8px_rgba(255,0,0,0.5)]'}
                           hover:scale-105`}
                       >
-                        <div className="relative w-24 h-24 mb-2">
+                        <div className="relative w-20 h-20 mb-2">
                           <Image
                             src={chaser.gif}
                             alt={chaser.alt}
@@ -678,11 +685,11 @@ export default function HostPage() {
                             style={{ imageRendering: "pixelated" }}
                           />
                         </div>
-                        <span className="text-white font-mono text-sm text-center">
+                        <span className="text-white font-mono text-xs text-center">
                           {chaser.name}
                         </span>
                         {chaserType === chaser.value && (
-                          <span className="absolute top-2 right-2 text-red-400 text-xs font-bold">✔</span>
+                          <span className="absolute top-1 right-1 text-red-400 text-xs font-bold">✔</span>
                         )}
                       </div>
                     ))}
@@ -708,6 +715,31 @@ export default function HostPage() {
           </Dialog>
         </div>
       </div>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 12px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(26, 0, 0, 0.8);
+          border-left: 2px solid rgba(255, 0, 0, 0.3);
+          box-shadow: inset 0 0 6px rgba(255, 0, 0, 0.2);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #8b0000, #ff0000);
+          border-radius: 6px;
+          border: 2px solid rgba(255, 0, 0, 0.5);
+          box-shadow: 0 0 8px rgba(255, 0, 0, 0.7);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #ff0000, #8b0000);
+          box-shadow: 0 0 12px rgba(255, 0, 0, 0.9);
+        }
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: #ff0000 rgba(26, 0, 0, 0.8);
+        }
+      `}</style>
     </div>
   );
 }
