@@ -283,6 +283,7 @@ export default function HostPage() {
           questions: formattedQuestions,
           duration: parseInt(gameDuration),
           chaser_type: chaserType,
+          game_start_time: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", room.id);
