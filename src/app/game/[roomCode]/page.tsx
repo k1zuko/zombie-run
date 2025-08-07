@@ -1,4 +1,3 @@
-// src/app/game/[roomCode]/page.tsx
 "use client"
 
 import type React from "react"
@@ -304,7 +303,7 @@ export default function GamePage() {
     }
   }, [room, currentPlayer, handleHealthStateUpdate, handleAttackEvent])
 
-  // Sync player health with quiz state and handle game over
+  // Sync player health with quiz state and handle elimination
   useEffect(() => {
     if (!isMountedRef.current || !currentPlayer || !playerHealthStates[currentPlayer.id]) return
 
@@ -317,25 +316,28 @@ export default function GamePage() {
     })
 
     if (healthState.health <= 0 && !isGameOver) {
+      console.log("💀 Player eliminated due to zero health")
       safeSetState(() => {
         setIsGameOver?.(true)
+      })
+      saveGameCompletion().then(() => {
         router.push(
-          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${quizState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=true`
+          `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${healthState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=true`
         )
       })
     }
-  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, roomCode, nickname, quizState, router])
+  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, roomCode, nickname, quizState, router, saveGameCompletion])
 
   // Handle game completion and redirect
   useEffect(() => {
-    if (gameState?.phase === "finished" && isMountedRef.current) {
+    if (gameState?.phase === "finished" && isMountedRef.current && !isGameOver) {
       saveGameCompletion().then(() => {
         router.push(
           `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${quizState.health}&correct=${quizState.correctAnswers}&total=${quizState.currentIndex + 1}&eliminated=${quizState.health <= 0}`
         )
       })
     }
-  }, [gameState?.phase, roomCode, nickname, quizState, saveGameCompletion, router])
+  }, [gameState?.phase, roomCode, nickname, quizState, saveGameCompletion, router, isGameOver])
 
   // Cleanup on unmount
   useEffect(() => {
