@@ -11,13 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Users, Play, Settings, Copy, Check, Clock, Trophy, Zap, Wifi, Skull, Bone, HeartPulse } from "lucide-react";
 import { supabase, type Player } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
+import Image from "next/image";   
 
 // Validasi tipe chaser
 const validChaserTypes = ["zombie", "monster1", "monster2", "monster3", "darknight"] as const;
 type ChaserType = typeof validChaserTypes[number];
 
-// Interface untuk GameRoom dengan chaser_type
+// Interface untuk GameRoom dengan chaser_type dan countdown_start
 interface GameRoom {
   id: string;
   room_code: string;
@@ -31,6 +31,7 @@ interface GameRoom {
   created_at: string;
   updated_at: string;
   chaser_type: ChaserType;
+  countdown_start: string | null;
 }
 
 const chaserOptions = [
@@ -108,7 +109,7 @@ export default function HostPage() {
     try {
       const { data, error } = await supabase
         .from("game_rooms")
-        .select("*, chaser_type")
+        .select("*, chaser_type, countdown_start")
         .eq("room_code", roomCode)
         .single();
 
@@ -203,7 +204,7 @@ export default function HostPage() {
           setGameDuration(newRoom.duration?.toString() || "600");
           setQuestionCount(newRoom.question_count?.toString() || "20");
           setChaserType(updatedChaserType);
-          if (newRoom.current_phase === "quiz") {
+          if (newRoom.current_phase === "quiz" && !countdown) {
             console.log("Mengalihkan host ke halaman quiz:", `/game/${roomCode}/host`);
             router.push(`/game/${roomCode}/host`);
           }
@@ -265,6 +266,41 @@ export default function HostPage() {
       clearInterval(textInterval);
     };
   }, []);
+
+  // Menangani countdown lokal
+  useEffect(() => {
+    if (!room?.countdown_start || countdown !== null) return;
+
+    const countdownStartTime = new Date(room.countdown_start).getTime();
+    const countdownDuration = 10; // 10 detik
+    const now = Date.now();
+    const elapsed = Math.floor((now - countdownStartTime) / 1000);
+    const remaining = Math.max(0, countdownDuration - elapsed);
+
+    if (remaining > 0) {
+      console.log("⏰ Memulai countdown lokal:", remaining, "detik");
+      setCountdown(remaining);
+      const timer = setInterval(() => {
+        const currentNow = Date.now();
+        const currentElapsed = Math.floor((currentNow - countdownStartTime) / 1000);
+        const currentRemaining = Math.max(0, countdownDuration - currentElapsed);
+        setCountdown(currentRemaining);
+
+        if (currentRemaining <= 0) {
+          console.log("⏰ Countdown selesai");
+          clearInterval(timer);
+          setCountdown(null);
+          setIsStarting(false);
+        }
+      }, 1000);
+
+      return () => clearInterval(timer);
+    } else {
+      console.log("⏰ Countdown sudah selesai saat memuat");
+      setCountdown(null);
+      setIsStarting(false);
+    }
+  }, [room?.countdown_start]);
 
   // Menyalin kode ruangan ke clipboard
   const copyRoomCode = async () => {
@@ -333,72 +369,111 @@ export default function HostPage() {
     setIsStarting(true);
 
     try {
-      const { data: questions, error: quizError } = await supabase
-        .from("quiz_questions")
-        .select("id, question_type, question_text, image_url, options, correct_answer");
-
-      if (quizError || !questions || questions.length === 0) {
-        throw new Error(`Gagal mengambil soal: ${quizError?.message || "Bank soal kosong"}`);
-      }
-
-      const selectedQuestionCount = parseInt(questionCount);
-      const shuffledQuestions = questions
-        .map((value) => ({ value, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map(({ value }) => value)
-        .slice(0, Math.min(selectedQuestionCount, questions.length));
-
-      const formattedQuestions = shuffledQuestions.map((q, index) => ({
-        id: q.id,
-        question_index: index + 1,
-        question_type: q.question_type,
-        question_text: q.question_text,
-        image_url: q.image_url,
-        options: q.options,
-        correct_answer: q.correct_answer,
-      }));
-
-      const validatedChaserType = validChaserTypes.includes(chaserType) ? chaserType : "zombie";
-      console.log("Memperbarui game room untuk memulai game dengan chaser_type:", validatedChaserType);
-      const { error: roomError } = await supabase
+      // Langkah 1: Atur countdown_start di Supabase
+      const countdownStartTime = new Date().toISOString();
+      console.log("⏰ Mengatur countdown_start:", countdownStartTime);
+      const { error: countdownError } = await supabase
         .from("game_rooms")
         .update({
-          status: "playing",
-          current_phase: "quiz",
-          questions: formattedQuestions,
-          duration: parseInt(gameDuration),
-          chaser_type: validatedChaserType,
-          game_start_time: new Date().toISOString(),
+          countdown_start: countdownStartTime,
           updated_at: new Date().toISOString(),
         })
         .eq("id", room.id);
 
-      if (roomError) {
-        throw new Error(`Gagal memulai game: ${roomError.message}`);
+      if (countdownError) {
+        throw new Error(`Gagal memulai countdown: ${countdownError.message}`);
       }
 
-      const { error: stateError } = await supabase.from("game_states").insert({
-        room_id: room.id,
-        phase: "quiz",
-        time_remaining: parseInt(gameDuration),
-        lives_remaining: 3,
-        target_correct_answers: Math.max(5, players.length * 2),
-        current_correct_answers: 0,
-        current_question_index: 0,
-        status: "playing",
-        created_at: new Date().toISOString(),
-      });
+      // Langkah 2: Mulai countdown lokal
+      setCountdown(10); // Mulai dari 10 detik
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(countdownInterval);
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
 
-      if (stateError) {
-        throw new Error(`Gagal membuat status permainan: ${stateError.message}`);
-      }
+      // Langkah 3: Tunggu hingga countdown selesai untuk memulai permainan
+      setTimeout(async () => {
+        try {
+          const { data: questions, error: quizError } = await supabase
+            .from("quiz_questions")
+            .select("id, question_type, question_text, image_url, options, correct_answer");
 
-      console.log("Game berhasil dimulai dengan chaser_type:", validatedChaserType);
+          if (quizError || !questions || questions.length === 0) {
+            throw new Error(`Gagal mengambil soal: ${quizError?.message || "Bank soal kosong"}`);
+          }
+
+          const selectedQuestionCount = parseInt(questionCount);
+          const shuffledQuestions = questions
+            .map((value) => ({ value, sort: Math.random() }))
+            .sort((a, b) => a.sort - b.sort)
+            .map(({ value }) => value)
+            .slice(0, Math.min(selectedQuestionCount, questions.length));
+
+          const formattedQuestions = shuffledQuestions.map((q, index) => ({
+            id: q.id,
+            question_index: index + 1,
+            question_type: q.question_type,
+            question_text: q.question_text,
+            image_url: q.image_url,
+            options: q.options,
+            correct_answer: q.correct_answer,
+          }));
+
+          const validatedChaserType = validChaserTypes.includes(chaserType) ? chaserType : "zombie";
+          console.log("Memperbarui game room untuk memulai game dengan chaser_type:", validatedChaserType);
+          const { error: roomError } = await supabase
+            .from("game_rooms")
+            .update({
+              status: "playing",
+              current_phase: "quiz",
+              questions: formattedQuestions,
+              duration: parseInt(gameDuration),
+              chaser_type: validatedChaserType,
+              game_start_time: new Date().toISOString(),
+              countdown_start: null, // Reset countdown_start setelah selesai
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", room.id);
+
+          if (roomError) {
+            throw new Error(`Gagal memulai game: ${roomError.message}`);
+          }
+
+          const { error: stateError } = await supabase.from("game_states").insert({
+            room_id: room.id,
+            phase: "quiz",
+            time_remaining: parseInt(gameDuration),
+            lives_remaining: 3,
+            target_correct_answers: Math.max(5, players.length * 2),
+            current_correct_answers: 0,
+            current_question_index: 0,
+            status: "playing",
+            created_at: new Date().toISOString(),
+          });
+
+          if (stateError) {
+            throw new Error(`Gagal membuat status permainan: ${stateError.message}`);
+          }
+
+          console.log("Game berhasil dimulai dengan chaser_type:", validatedChaserType);
+          router.push(`/game/${roomCode}/host`);
+        } catch (error) {
+          console.error("Error memulai game:", error);
+          alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
+          setIsStarting(false);
+          setCountdown(null);
+        }
+      }, 10000); // Tunggu 10 detik sebelum memulai permainan
     } catch (error) {
-      console.error("Error memulai game:", error);
-      alert("Gagal memulai game: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
-    } finally {
+      console.error("Error memulai countdown:", error);
+      alert("Gagal memulai countdown: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
       setIsStarting(false);
+      setCountdown(null);
     }
   };
 
@@ -499,7 +574,28 @@ export default function HostPage() {
         <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-12 max-w-6xl">
+      {/* Overlay Countdown */}
+      <AnimatePresence>
+        {countdown !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+              className="text-[20rem] md:text-[30rem] font-mono font-bold text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]"
+            >
+              {countdown}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Konten Utama */}
+      <div className={`relative z-10 container mx-auto px-4 py-12 max-w-6xl ${countdown !== null ? "hidden" : ""}`}>
         {/* Header Section */}
         <motion.div
           initial={{ opacity: 0, y: -50 }}
@@ -566,16 +662,6 @@ export default function HostPage() {
               </span>
             </div>
           </motion.div>
-          {countdown !== null && (
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="mt-8">
-              <div className="text-5xl md:text-6xl font-mono text-red-500 animate-pulse drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">
-                {countdown}
-              </div>
-              <div className="text-lg md:text-xl text-red-400 font-mono mt-2 tracking-wider">
-                PERMAINAN DIMULAI DALAM...
-              </div>
-            </motion.div>
-          )}
         </motion.div>
 
         {/* Game Info Cards */}

@@ -1,15 +1,18 @@
 
 "use client";
 
+// Mengimpor dependensi yang diperlukan
 import { useState, useEffect } from "react";
 import { Users, Skull, Zap, Play, Ghost, Bone, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import SoulStatus from "./SoulStatus";
-import CountdownPhase from "../CountDownPhase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import Image from "next/image";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 
+// Mendefinisikan tipe data untuk Player
 interface Player {
   id: string;
   nickname: string;
@@ -22,6 +25,7 @@ interface Player {
   character_type?: string;
 }
 
+// Mendefinisikan tipe data untuk props LobbyPhase
 interface LobbyPhaseProps {
   currentPlayer: Player;
   players: Player[];
@@ -30,6 +34,7 @@ interface LobbyPhaseProps {
   wrongAnswers?: number;
 }
 
+// Opsi karakter yang tersedia
 const characterOptions = [
   { value: "robot1", name: "Hijau", gif: "/character/character.gif", alt: "Karakter Hijau" },
   { value: "robot2", name: "Biru", gif: "/character/character1.gif", alt: "Karakter Biru" },
@@ -50,15 +55,17 @@ export default function LobbyPhase({
   isSoloMode,
   wrongAnswers = 0,
 }: LobbyPhaseProps) {
+  // State untuk mengelola efek UI dan data permainan
   const [flickerText, setFlickerText] = useState(true);
   const [bloodDrips, setBloodDrips] = useState<Array<{ id: number; left: number; speed: number; delay: number }>>([]);
   const [atmosphereText, setAtmosphereText] = useState("Dinding-dinding berbisik tentang dosa-dosamu...");
   const [countdown, setCountdown] = useState<number | null>(null);
   const [room, setRoom] = useState<any>(null);
-  const [showCountdownPhase, setShowCountdownPhase] = useState(false);
   const [isCharacterDialogOpen, setIsCharacterDialogOpen] = useState(false);
   const [selectedCharacter, setSelectedCharacter] = useState(currentPlayer.character_type || "robot1");
+  const router = useRouter();
 
+  // Teks atmosfer untuk menciptakan suasana
   const atmosphereTexts = [
     "Dinding-dinding berbisik tentang dosa-dosamu...",
     "Darah menetes dari langit-langit...",
@@ -72,14 +79,21 @@ export default function LobbyPhase({
     "Jiwamu sudah hilang...",
   ];
 
-  // Mengambil data ruangan
+  // Mengambil data ruangan dari Supabase
   useEffect(() => {
     const fetchRoom = async () => {
-      if (!currentPlayer.room_id) return;
+      if (!currentPlayer.room_id) {
+        console.warn("⚠️ LobbyPhase: Tidak ada room_id untuk currentPlayer");
+        return;
+      }
 
       try {
         console.log("🏠 LobbyPhase: Mengambil data ruangan untuk room_id:", currentPlayer.room_id);
-        const { data, error } = await supabase.from("game_rooms").select("*").eq("id", currentPlayer.room_id).single();
+        const { data, error } = await supabase
+          .from("game_rooms")
+          .select("*, countdown_start")
+          .eq("id", currentPlayer.room_id)
+          .single();
 
         if (error) {
           console.error("❌ LobbyPhase: Gagal mengambil ruangan:", error);
@@ -98,7 +112,10 @@ export default function LobbyPhase({
 
   // Langganan real-time untuk pembaruan ruangan
   useEffect(() => {
-    if (!currentPlayer.room_id) return;
+    if (!currentPlayer.room_id) {
+      console.warn("⚠️ LobbyPhase: Tidak ada room_id untuk langganan real-time");
+      return;
+    }
 
     console.log("🔗 LobbyPhase: Menyiapkan langganan real-time untuk room_id:", currentPlayer.room_id);
 
@@ -115,11 +132,17 @@ export default function LobbyPhase({
         (payload) => {
           console.log("📡 LobbyPhase: Pembaruan ruangan diterima:", payload);
           console.log("📡 LobbyPhase: Data ruangan baru:", payload.new);
+          console.log("📡 LobbyPhase: countdown_start baru:", payload.new.countdown_start);
           setRoom(payload.new);
-        },
+        }
       )
-      .subscribe((status) => {
-        console.log("📡 LobbyPhase: Status langganan:", status);
+      .subscribe((status, err) => {
+        console.log("📡 LobbyPhase: Status langganan:", status, err ? err.message : "");
+        if (status === "SUBSCRIBED") {
+          console.log("📡 LobbyPhase: Berlangganan berhasil");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("📡 LobbyPhase: Error langganan:", err?.message);
+        }
       });
 
     return () => {
@@ -128,39 +151,52 @@ export default function LobbyPhase({
     };
   }, [currentPlayer.room_id]);
 
+  // Menangani transisi fase ke quiz
+  useEffect(() => {
+    if (room?.current_phase === "quiz") {
+      console.log("🔄 LobbyPhase: Mengalihkan ke halaman quiz");
+      router.push(`/game/${room.id}/play`);
+    }
+  }, [room?.current_phase, router]);
+
   // Menangani countdown berdasarkan countdown_start ruangan
   useEffect(() => {
     console.log("⏰ LobbyPhase: Memeriksa countdown_start:", room?.countdown_start);
 
     if (!room?.countdown_start) {
-      console.log("⏰ LobbyPhase: Tidak ada countdown_start, menyembunyikan fase countdown");
+      console.log("⏰ LobbyPhase: Tidak ada countdown_start, menyembunyikan countdown");
       setCountdown(null);
-      setShowCountdownPhase(false);
       return;
     }
 
-    const countdownStart = room.countdown_start;
-    const now = Date.now();
-    const elapsed = Math.floor((now - countdownStart) / 1000);
-    const remaining = Math.max(0, 5 - elapsed);
+    const countdownStart = new Date(room.countdown_start).getTime();
+    if (isNaN(countdownStart)) {
+      console.error("❌ LobbyPhase: countdown_start tidak valid:", room.countdown_start);
+      setCountdown(null);
+      return;
+    }
 
-    console.log("⏰ LobbyPhase: Perhitungan countdown:", {
+    const countdownDuration = 10; // Durasi countdown 10 detik
+    const calculateRemaining = () => {
+      const now = new Date().getTime();
+      const elapsed = Math.floor((now - countdownStart) / 1000);
+      return Math.max(0, countdownDuration - elapsed);
+    };
+
+    const initialRemaining = calculateRemaining();
+    console.log("⏰ LobbyPhase: Perhitungan awal countdown:", {
       countdownStart,
-      now,
-      elapsed,
-      remaining,
+      now: new Date().getTime(),
+      elapsed: Math.floor((new Date().getTime() - countdownStart) / 1000),
+      remaining: initialRemaining,
     });
 
-    if (remaining > 0) {
-      console.log("🚀 LobbyPhase: Memulai countdown dengan sisa", remaining, "detik");
-      setCountdown(remaining);
-      setShowCountdownPhase(true);
+    if (initialRemaining > 0) {
+      console.log("🚀 LobbyPhase: Memulai countdown dengan sisa", initialRemaining, "detik");
+      setCountdown(initialRemaining);
 
       const timer = setInterval(() => {
-        const currentNow = Date.now();
-        const currentElapsed = Math.floor((currentNow - countdownStart) / 1000);
-        const currentRemaining = Math.max(0, 5 - currentElapsed);
-
+        const currentRemaining = calculateRemaining();
         console.log("⏰ LobbyPhase: Tick countdown:", currentRemaining);
         setCountdown(currentRemaining);
 
@@ -168,15 +204,16 @@ export default function LobbyPhase({
           console.log("⏰ LobbyPhase: Countdown selesai");
           clearInterval(timer);
           setCountdown(null);
-          setShowCountdownPhase(false);
         }
-      }, 100);
+      }, 1000);
 
-      return () => clearInterval(timer);
+      return () => {
+        console.log("⏰ LobbyPhase: Membersihkan timer countdown");
+        clearInterval(timer);
+      };
     } else {
-      console.log("⏰ LobbyPhase: Countdown sudah selesai");
+      console.log("⏰ LobbyPhase: Countdown sudah selesai atau kedaluwarsa");
       setCountdown(null);
-      setShowCountdownPhase(false);
     }
   }, [room?.countdown_start]);
 
@@ -202,12 +239,9 @@ export default function LobbyPhase({
 
   // Efek flicker dan teks atmosfer
   useEffect(() => {
-    const flickerInterval = setInterval(
-      () => {
-        setFlickerText((prev) => !prev);
-      },
-      100 + Math.random() * 150,
-    );
+    const flickerInterval = setInterval(() => {
+      setFlickerText((prev) => !prev);
+    }, 100 + Math.random() * 150);
 
     const textInterval = setInterval(() => {
       setAtmosphereText(atmosphereTexts[Math.floor(Math.random() * atmosphereTexts.length)]);
@@ -243,11 +277,14 @@ export default function LobbyPhase({
 
   // Fungsi mulai permainan untuk host
   const handleStartGame = async () => {
-    if (!currentPlayer.isHost || !currentPlayer.room_id) return;
+    if (!currentPlayer.isHost || !currentPlayer.room_id) {
+      console.warn("⚠️ LobbyPhase: Bukan host atau tidak ada room_id");
+      return;
+    }
 
     try {
       console.log("🎮 LobbyPhase: Host memulai permainan...");
-      const countdownStartTime = Date.now();
+      const countdownStartTime = new Date().toISOString();
 
       const { error } = await supabase
         .from("game_rooms")
@@ -259,43 +296,30 @@ export default function LobbyPhase({
 
       if (error) {
         console.error("❌ LobbyPhase: Gagal memulai countdown:", error);
+        alert("Gagal memulai countdown: " + error.message);
         return;
       }
 
       console.log("✅ LobbyPhase: Countdown berhasil dimulai dengan timestamp:", countdownStartTime);
     } catch (error) {
       console.error("❌ LobbyPhase: Gagal memulai countdown:", error);
+      alert("Gagal memulai countdown: " + (error instanceof Error ? error.message : "Kesalahan tidak diketahui"));
     }
   };
 
-  // Menangani penyelesaian countdown
-  const handleCountdownComplete = () => {
-    console.log("🎯 LobbyPhase: Countdown selesai!");
-    setShowCountdownPhase(false);
-    setCountdown(null);
-  };
-
-  // Urutkan pemain agar currentPlayer muncul pertama
+  // Mengurutkan pemain agar currentPlayer muncul pertama
   const sortedPlayers = [...players].sort((a, b) => {
-    if (a.id === currentPlayer.id) return -1; // currentPlayer di urutan pertama
+    if (a.id === currentPlayer.id) return -1;
     if (b.id === currentPlayer.id) return 1;
-    return 0; // Urutan lainnya tetap
+    return 0;
   });
 
   console.log("🔍 LobbyPhase: Current Player:", currentPlayer);
   console.log("🔍 LobbyPhase: Sorted Players:", sortedPlayers);
   console.log("🎨 LobbyPhase: Keputusan render:", {
-    showCountdownPhase,
     countdown,
     roomCountdownStart: room?.countdown_start,
   });
-
-  if (showCountdownPhase && countdown !== null) {
-    console.log("🎬 LobbyPhase: Merender CountdownPhase dengan countdown:", countdown);
-    return <CountdownPhase initialCountdown={countdown} onCountdownComplete={handleCountdownComplete} />;
-  }
-
-  console.log("🏠 LobbyPhase: Merender lobi normal");
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden select-none">
@@ -352,6 +376,20 @@ export default function LobbyPhase({
       {/* Lapisan goresan */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJzY3JhdGNoZXMiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiIHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIj48cGF0aCBkPSJNMCAwTDUwMCA1MDAiIHN0cm9rZT0icmdiYSgyNTUsMCwwLDAuMDMpIiBzdHJva2Utd2lkdGg9IjEiLz48cGF0aCBkPSJNMCAxMDBMNTAwIDYwMCIgc3Ryb2tlPSJyZ2JhKDI1NSwwLDAsMC4wMykiIHN0cm9rZS13aWR0aD0iMSIvPjxwYXRoIGQ9Ik0wIDIwMEw1MDAgNzAwIiBzdHJva2U9InJnYmEoMjU1LDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI3NjcmF0Y2hlcykiIG9wYWNpdHk9IjAuMyIvPjwvc3ZnPg==')] opacity-20" />
 
+      {/* Noda darah di sudut */}
+      <div className="absolute top-0 left-0 w-64 h-64 opacity-20">
+        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
+      </div>
+      <div className="absolute top-0 right-0 w-64 h-64 opacity-20">
+        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
+      </div>
+      <div className="absolute bottom-0 left-0 w-64 h-64 opacity-20">
+        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
+      </div>
+      <div className="absolute bottom-0 right-0 w-64 h-64 opacity-20">
+        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
+      </div>
+
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -370,6 +408,24 @@ export default function LobbyPhase({
 
           <p className="text-red-400/80 text-xl font-mono animate-pulse tracking-wider">{atmosphereText}</p>
         </div>
+
+        {/* Tampilan Countdown */}
+        {countdown !== null && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 flex flex-col items-center justify-center z-[1000] bg-black/80"
+            onClick={() => console.log("⏰ LobbyPhase: Countdown div dirender, countdown:", countdown)}
+          >
+            <div className="text-8xl md:text-9xl font-mono font-bold text-red-500 animate-pulse drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">
+              {countdown}
+            </div>
+            <div className="text-2xl md:text-3xl text-red-400 font-mono mt-4 tracking-wider">
+              PERMAINAN DIMULAI DALAM...
+            </div>
+          </motion.div>
+        )}
 
         {/* Grid Pemain */}
         <div className="max-w-5xl mx-auto mb-8 md:h-auto h-[calc(100vh-150px)] overflow-y-auto">
@@ -446,7 +502,7 @@ export default function LobbyPhase({
         {/* Tombol Pilih Karakter */}
         {!currentPlayer.isHost && (
           <>
-            {/* Tampilan Smartphone (lebar layar < 768px) */}
+            {/* Tampilan Smartphone */}
             <div className="md:hidden fixed bottom-4 left-0 w-full px-4 z-30 bg-black/80">
               <Button
                 onClick={() => setIsCharacterDialogOpen(true)}
@@ -456,7 +512,7 @@ export default function LobbyPhase({
                 <span className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
               </Button>
             </div>
-            {/* Tampilan Desktop (lebar layar >= 768px) */}
+            {/* Tampilan Desktop */}
             <div className="hidden md:block fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 max-w-md w-full px-4">
               <Button
                 onClick={() => setIsCharacterDialogOpen(true)}
@@ -490,7 +546,11 @@ export default function LobbyPhase({
                     }}
                     onKeyDown={(e) => e.key === "Enter" && setSelectedCharacter(character.value)}
                     className={`relative flex flex-col items-center p-3 sm:p-4 rounded-lg cursor-pointer transition-all duration-300
-                      ${selectedCharacter === character.value ? 'border-2 border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.7)] bg-red-900/30' : 'border border-white/20 bg-white/10 hover:bg-red-500/20 hover:shadow-[0_0_8px_rgba(255,0,0,0.5)]'}
+                      ${
+                        selectedCharacter === character.value
+                          ? "border-2 border-red-500 shadow-[0_0_10px_rgba(255,0,0,0.7)] bg-red-900/30"
+                          : "border border-white/20 bg-white/10 hover:bg-red-500/20 hover:shadow-[0_0_8px_rgba(255,0,0,0.5)]"
+                      }
                       hover:scale-105`}
                   >
                     <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-2">
@@ -503,9 +563,7 @@ export default function LobbyPhase({
                         style={{ imageRendering: "pixelated" }}
                       />
                     </div>
-                    <span className="text-white font-mono text-xs sm:text-sm text-center">
-                      {character.name}
-                    </span>
+                    <span className="text-white font-mono text-xs sm:text-sm text-center">{character.name}</span>
                     {selectedCharacter === character.value && (
                       <span className="absolute top-1 sm:top-2 right-1 sm:right-2 text-red-400 text-xs font-bold">✔</span>
                     )}
@@ -530,20 +588,6 @@ export default function LobbyPhase({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
-      {/* Noda darah di sudut */}
-      <div className="absolute top-0 left-0 w-64 h-64 opacity-20">
-        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
-      </div>
-      <div className="absolute top-0 right-0 w-64 h-64 opacity-20">
-        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
-      </div>
-      <div className="absolute bottom-0 left-0 w-64 h-64 opacity-20">
-        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
-      </div>
-      <div className="absolute bottom-0 right-0 w-64 h-64 opacity-20">
-        <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/70 to-transparent" />
       </div>
 
       <style jsx global>{`
