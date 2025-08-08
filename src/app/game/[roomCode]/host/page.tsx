@@ -28,7 +28,7 @@ interface GameRoom {
   status: string;
   max_players: number;
   current_phase: string;
-  chaser_type: "zombie" | "monster1" | "monster2" | "darknight";
+  chaser_type: "zombie" | "monster1" | "monster2" | "monster3" | "darknight";
 }
 
 interface PlayerHealthState {
@@ -100,7 +100,7 @@ export default function HostGamePage() {
   const [imageLoadStatus, setImageLoadStatus] = useState<{ [key: string]: boolean }>({});
   const [players, setPlayers] = useState<Player[]>([]);
   const [gameRoom, setGameRoom] = useState<GameRoom | null>(null);
-  const [chaserType, setChaserType] = useState<"zombie" | "monster1" | "monster2" | "darknight">("zombie");
+  const [chaserType, setChaserType] = useState<"zombie" | "monster1" | "monster2" | "monster3" | "darknight">("zombie");
   const [isLoading, setIsLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
   const [completedPlayers, setCompletedPlayers] = useState<Player[]>([]);
@@ -118,19 +118,6 @@ export default function HostGamePage() {
   const [backgroundFlash, setBackgroundFlash] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const attackIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Memperbarui chaserType dari gameRoom
-  useEffect(() => {
-    if (gameRoom?.chaser_type) {
-      console.log(`Selected chaser: ${gameRoom.chaser_type}`);
-      setChaserType(gameRoom.chaser_type);
-    }
-  }, [gameRoom?.chaser_type]);
-
-  // Mendapatkan karakter berdasarkan tipe
-  const getCharacterByType = (type: string) => {
-    return characterGifs.find((char) => char.type === type) || characterGifs[0];
-  };
 
   // Inisialisasi status pemain
   const initializePlayerStates = useCallback((playersData: Player[], healthData: PlayerHealthState[]) => {
@@ -213,7 +200,9 @@ export default function HostGamePage() {
       const playerState = playerStates[playerId];
       const player = players.find((p) => p.id === playerId);
       if (!playerState || !player || newHealth < 0 || !player.is_alive) {
-        console.log(`⚠️ Pemain ${playerId} tidak valid untuk diserang (health=${newHealth}, is_alive=${player?.is_alive})`);
+        console.log(
+          `⚠️ Pemain ${playerId} tidak valid untuk diserang (health=${newHealth}, is_alive=${player?.is_alive})`
+        );
         setAttackQueue((prev) => prev.filter((id) => id !== playerId));
         return;
       }
@@ -241,16 +230,19 @@ export default function HostGamePage() {
       setBackgroundFlash(true);
       setGameMode("panic");
 
-      // Pastikan is_being_attacked disetel ke true, bahkan untuk health === 1
-      updatePlayerState(playerId, {
-        health: newHealth,
-        speed: newSpeed,
-        is_being_attacked: true,
-      }, {
-        isBeingAttacked: true,
-        attackIntensity: 0.5,
-        countdown: undefined,
-      });
+      updatePlayerState(
+        playerId,
+        {
+          health: newHealth,
+          speed: newSpeed,
+          is_being_attacked: true,
+        },
+        {
+          isBeingAttacked: true,
+          attackIntensity: 0.5,
+          countdown: undefined,
+        }
+      );
 
       let progress = 0;
       attackIntervalRef.current = setInterval(() => {
@@ -274,13 +266,17 @@ export default function HostGamePage() {
             currentPosition: 500,
           });
 
-          updatePlayerState(playerId, {
-            is_being_attacked: false,
-          }, {
-            isBeingAttacked: false,
-            attackIntensity: 0,
-            countdown: newSpeed <= 30 && newHealth > 0 && player.is_alive ? 5 : undefined,
-          });
+          updatePlayerState(
+            playerId,
+            {
+              is_being_attacked: false,
+            },
+            {
+              isBeingAttacked: false,
+              attackIntensity: 0,
+              countdown: newSpeed <= 30 && newHealth > 0 && player.is_alive ? 5 : undefined,
+            }
+          );
 
           setBackgroundFlash(false);
           setGameMode("normal");
@@ -317,15 +313,19 @@ export default function HostGamePage() {
       }
 
       console.log(`✅ Pemain ${playerId} menjawab benar, kecepatan baru: ${newSpeed}`);
-      updatePlayerState(playerId, {
-        speed: newSpeed,
-        is_being_attacked: false,
-        last_answer_time: new Date().toISOString(),
-      }, {
-        speed: newSpeed,
-        isBeingAttacked: false,
-        countdown: newSpeed <= 30 ? 5 : undefined,
-      });
+      updatePlayerState(
+        playerId,
+        {
+          speed: newSpeed,
+          is_being_attacked: false,
+          last_answer_time: new Date().toISOString(),
+        },
+        {
+          speed: newSpeed,
+          isBeingAttacked: false,
+          countdown: newSpeed <= 30 ? 5 : undefined,
+        }
+      );
 
       if (zombieState.targetPlayerId === playerId && zombieState.isAttacking) {
         console.log(`🛑 Menghentikan serangan pada ${playerId} karena jawaban benar`);
@@ -360,7 +360,6 @@ export default function HostGamePage() {
       let activePlayers = 0;
       let eligiblePlayer: string | null = null;
 
-      // Hitung pemain aktif dan cari kandidat serangan
       Object.entries(updatedStates).forEach(([playerId, state]) => {
         const player = players.find((p) => p.id === playerId);
         if (player && state.health > 0 && player.is_alive) {
@@ -383,7 +382,6 @@ export default function HostGamePage() {
           return;
         }
 
-        // Penalti ketidakaktifan
         const healthState = playerHealthStates[playerId];
         if (healthState) {
           const timeSinceLastAnswer = (Date.now() - new Date(healthState.last_answer_time).getTime()) / 1000;
@@ -397,7 +395,6 @@ export default function HostGamePage() {
           }
         }
 
-        // Countdown untuk serangan
         if (state.speed <= 30 && !state.isBeingAttacked && state.health > 0) {
           if (!state.countdown) {
             console.log(`⏲️ Menambahkan countdown untuk ${playerId}`);
@@ -425,14 +422,14 @@ export default function HostGamePage() {
         }
       });
 
-      // Pastikan attackQueue hanya berisi pemain yang memenuhi syarat
-      setAttackQueue(newAttackQueue.filter((id) => {
-        const state = updatedStates[id];
-        const player = players.find((p) => p.id === id);
-        return state && state.speed <= 30 && state.health > 0 && player?.is_alive && !state.isBeingAttacked;
-      }));
+      setAttackQueue(
+        newAttackQueue.filter((id) => {
+          const state = updatedStates[id];
+          const player = players.find((p) => p.id === id);
+          return state && state.speed <= 30 && state.health > 0 && player?.is_alive && !state.isBeingAttacked;
+        })
+      );
 
-      // Jika hanya satu pemain tersisa dan tidak ada serangan aktif, pilih pemain untuk diserang
       if (activePlayers === 1 && !zombieState.isAttacking && eligiblePlayer) {
         console.log(`🧟 Hanya satu pemain tersisa (${eligiblePlayer}), memulai serangan`);
         const state = updatedStates[eligiblePlayer];
@@ -470,12 +467,13 @@ export default function HostGamePage() {
         .single();
       console.timeEnd("fetchRoom");
 
-      if (roomError) {
+      if (roomError || !room) {
         console.error("Gagal mengambil data ruangan:", roomError);
         throw new Error("Ruangan tidak ditemukan");
       }
-      console.log("Mengambil room:", room);
+      console.log("Mengambil room:", { ...room, chaser_type: room.chaser_type });
       setGameRoom(room);
+      setChaserType(room.chaser_type || "zombie");
 
       if (room.current_phase === "completed") {
         console.log("Fase permainan selesai, mengalihkan ke hasil");
@@ -565,10 +563,10 @@ export default function HostGamePage() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "game_rooms", filter: `id=eq.${gameRoom.id}` },
         (payload) => {
-          console.log("Perubahan room terdeteksi:", payload);
+          console.log("Perubahan room terdeteksi:", { ...payload.new, chaser_type: payload.new.chaser_type });
           const newRoom = payload.new as GameRoom;
           setGameRoom(newRoom);
-          setChaserType(newRoom.chaser_type);
+          setChaserType(newRoom.chaser_type || "zombie");
           if (newRoom.current_phase === "completed") {
             console.log("Mengalihkan host ke halaman hasil");
             setIsLoading(false);
@@ -599,7 +597,8 @@ export default function HostGamePage() {
               speed: healthState.speed,
               isBeingAttacked: healthState.is_being_attacked,
               lastAttackTime: new Date(healthState.last_attack_time).getTime(),
-              countdown: healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 5 : undefined,
+              countdown:
+                healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 5 : undefined,
             },
           }));
         }
@@ -666,9 +665,7 @@ export default function HostGamePage() {
         (payload) => {
           console.log("Perubahan pemain terdeteksi:", payload);
           const updatedPlayer = payload.new as Player;
-          setPlayers((prev) =>
-            prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p))
-          );
+          setPlayers((prev) => prev.map((p) => (p.id === updatedPlayer.id ? { ...p, ...updatedPlayer } : p)));
         }
       )
       .subscribe((status) => {
@@ -711,6 +708,7 @@ export default function HostGamePage() {
         "/images/zombie.gif",
         "/images/monster1.gif",
         "/images/monster2.gif",
+        "/images/monster3.gif",
         "/images/darknight.gif",
       ];
       for (const file of chaserFiles) {
@@ -775,12 +773,15 @@ export default function HostGamePage() {
     return imageLoadStatus[character.src] ? character.src : characterGifs[0].src;
   };
 
+  // Mendapatkan karakter berdasarkan tipe
+  const getCharacterByType = (type: string) => {
+    return characterGifs.find((char) => char.type === type) || characterGifs[0];
+  };
+
   if (!isClient || isLoading) {
     return (
       <div className="relative w-full h-screen bg-black flex items-center justify-center">
-        <div className="text-white text-xl">
-          {loadingError ? loadingError : "Memuat Kejaran Pengejar..."}
-        </div>
+        <div className="text-white text-xl">{loadingError ? loadingError : "Memuat Kejaran Pengejar..."}</div>
       </div>
     );
   }
@@ -791,7 +792,9 @@ export default function HostGamePage() {
     <div
       className="relative w-full h-screen bg-black overflow-hidden"
       style={{
-        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)}px)`,
+        transform: `translate(${Math.sin(animationTime * 0.1) * (gameMode === "panic" ? 5 : 2)}px, ${
+          Math.cos(animationTime * 0.1) * (gameMode === "panic" ? 3 : 1)
+        }px)`,
       }}
     >
       <audio src="/musics/zombies.mp3" autoPlay />
@@ -892,9 +895,7 @@ export default function HostGamePage() {
               <div id="completion-dialog-description" className="sr-only">
                 Popup untuk menampilkan pemain yang lolos dari permainan
               </div>
-              <h2 className="text-2xl font-bold text-white font-mono mb-4">
-                Selamat Anda Lolos dari Kejaran!
-              </h2>
+              <h2 className="text-2xl font-bold text-white font-mono mb-4">Selamat Anda Lolos dari Kejaran!</h2>
               <div className="flex justify-center gap-4 mb-6">
                 {completedPlayers.map((player) => {
                   const character = getCharacterByType(player.character_type);

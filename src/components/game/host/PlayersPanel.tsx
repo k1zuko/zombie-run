@@ -81,59 +81,64 @@ export default function PlayersPanel({
         {players.length === 0 ? (
           <div className="text-gray-400">Tidak ada pemain di ruangan ini</div>
         ) : (
-          players.map((player) => {
-            const character = getCharacterByType(player.character_type) || {
-              src: "/images/default-character.gif",
-              alt: "Karakter Default",
-            };
-            const playerState = playerStates[player.id] || {
-              health: 3,
-              maxHealth: 3,
-              speed: 20,
-              isBeingAttacked: false,
-              countdown: undefined,
-            };
-            const { health, maxHealth, speed, isBeingAttacked, countdown } = playerState;
-            const isRecentlyAttacked = recentAttacks.has(player.id);
+          players
+            .filter((player) => {
+              const playerState = playerStates[player.id] || { health: 3 };
+              return playerState.health > 0;
+            })
+            .map((player) => {
+              const character = getCharacterByType(player.character_type) || {
+                src: "/images/default-character.gif",
+                alt: "Karakter Default",
+              };
+              const playerState = playerStates[player.id] || {
+                health: 3,
+                maxHealth: 3,
+                speed: 20,
+                isBeingAttacked: false,
+                countdown: undefined,
+              };
+              const { health, maxHealth, speed, isBeingAttacked, countdown } = playerState;
+              const isRecentlyAttacked = recentAttacks.has(player.id);
 
-            return (
-              <div
-                key={player.id}
-                className={`flex items-center gap-2 p-2 rounded-md ${
-                  isBeingAttacked || isRecentlyAttacked ? "bg-red-900/50" : ""
-                } ${!player.is_alive ? "opacity-50" : ""}`}
-              >
-                <img
-                  src={getWorkingImagePath(character)}
-                  alt={character.alt}
-                  className="w-8 h-8 object-contain"
-                  onError={(e) => {
-                    e.currentTarget.src = "/images/default-character.gif";
-                  }}
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-bold">{player.nickname}</span>
-                    {!player.is_alive && (
-                      <span className="text-red-500 text-xs">(Tersingkir)</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    Kesehatan: {health}/{maxHealth} | Kecepatan: {speed}
-                    {countdown !== undefined && countdown > 0 && (
-                      <span className="text-yellow-300"> | Timer: {countdown}s</span>
-                    )}
-                    {isBeingAttacked && (
-                      <span className="text-red-500"> (Diserang)</span>
-                    )}
-                    {isRecentlyAttacked && !isBeingAttacked && (
-                      <span className="text-orange-500"> (Baru Diserang)</span>
-                    )}
+              return (
+                <div
+                  key={player.id}
+                  className={`flex items-center gap-2 p-2 rounded-md ${
+                    isBeingAttacked || isRecentlyAttacked ? "bg-red-900/50" : ""
+                  } ${!player.is_alive ? "opacity-50" : ""}`}
+                >
+                  <img
+                    src={getWorkingImagePath(character)}
+                    alt={character.alt}
+                    className="w-8 h-8 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.src = "/images/default-character.gif";
+                    }}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold">{player.nickname}</span>
+                      {!player.is_alive && (
+                        <span className="text-red-500 text-xs">(Tersingkir)</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      Kesehatan: {health}/{maxHealth} | Kecepatan: {speed}
+                      {countdown !== undefined && countdown > 0 && (
+                        <span className="text-yellow-300"> | Timer: {countdown}s</span>
+                      )}
+                      {isBeingAttacked && (
+                        <span className="text-red-500"> (Diserang)</span>
+                      )}
+                      {isRecentlyAttacked && !isBeingAttacked && (
+                        <span className="text-orange-500"> (Baru Diserang)</span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })
         )}
       </div>
     </div>

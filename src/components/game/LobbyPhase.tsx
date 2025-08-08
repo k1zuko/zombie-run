@@ -275,6 +275,15 @@ export default function LobbyPhase({
     setCountdown(null);
   };
 
+  // Urutkan pemain agar currentPlayer muncul pertama
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.id === currentPlayer.id) return -1; // currentPlayer di urutan pertama
+    if (b.id === currentPlayer.id) return 1;
+    return 0; // Urutan lainnya tetap
+  });
+
+  console.log("🔍 LobbyPhase: Current Player:", currentPlayer);
+  console.log("🔍 LobbyPhase: Sorted Players:", sortedPlayers);
   console.log("🎨 LobbyPhase: Keputusan render:", {
     showCountdownPhase,
     countdown,
@@ -363,9 +372,9 @@ export default function LobbyPhase({
         </div>
 
         {/* Grid Pemain */}
-        <div className="max-w-5xl mx-auto mb-8">
+        <div className="max-w-5xl mx-auto mb-8 md:h-auto h-[calc(100vh-150px)] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {players.map((player) => (
+            {sortedPlayers.map((player) => (
               <div
                 key={player.id}
                 className="relative bg-black/40 border border-red-900/50 rounded-lg p-4 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
@@ -405,16 +414,6 @@ export default function LobbyPhase({
           </div>
 
           <div className="space-y-4">
-            {!currentPlayer.isHost && (
-              <Button
-                onClick={() => setIsCharacterDialogOpen(true)}
-                className="relative overflow-hidden bg-gradient-to-r from-gray-900 to-gray-700 hover:from-gray-800 hover:to-gray-600 text-white font-mono text-xl px-10 py-6 rounded-lg border-2 border-gray-700 shadow-[0_0_20px_rgba(107,114,128,0.3)] transition-all duration-300 group"
-              >
-                <span className="relative z-10">PILIH KARAKTER</span>
-                <span className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
-              </Button>
-            )}
-
             {currentPlayer.isHost && (
               <Button
                 onClick={handleStartGame}
@@ -443,6 +442,32 @@ export default function LobbyPhase({
             )}
           </div>
         </div>
+
+        {/* Tombol Pilih Karakter */}
+        {!currentPlayer.isHost && (
+          <>
+            {/* Tampilan Smartphone (lebar layar < 768px) */}
+            <div className="md:hidden fixed bottom-4 left-0 w-full px-4 z-30 bg-black/80">
+              <Button
+                onClick={() => setIsCharacterDialogOpen(true)}
+                className="w-full relative overflow-hidden bg-gradient-to-r from-gray-900 to-gray-700 hover:from-gray-800 hover:to-gray-600 text-white font-mono text-base px-4 py-3 rounded-lg border-2 border-gray-700 shadow-[0_0_20px_rgba(107,114,128,0.3)] transition-all duration-300 group"
+              >
+                <span className="relative z-10">PILIH KARAKTER</span>
+                <span className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
+              </Button>
+            </div>
+            {/* Tampilan Desktop (lebar layar >= 768px) */}
+            <div className="hidden md:block fixed bottom-4 left-1/2 transform -translate-x-1/2 z-20 max-w-md w-full px-4">
+              <Button
+                onClick={() => setIsCharacterDialogOpen(true)}
+                className="w-full relative overflow-hidden bg-gradient-to-r from-gray-900 to-gray-700 hover:from-gray-800 hover:to-gray-600 text-white font-mono text-xl px-10 py-6 rounded-lg border-2 border-gray-700 shadow-[0_0_20px_rgba(107,114,128,0.3)] transition-all duration-300 group"
+              >
+                <span className="relative z-10">PILIH KARAKTER</span>
+                <span className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 bg-white" />
+              </Button>
+            </div>
+          </>
+        )}
 
         {/* Dialog Pemilihan Karakter */}
         <Dialog open={isCharacterDialogOpen} onOpenChange={setIsCharacterDialogOpen}>

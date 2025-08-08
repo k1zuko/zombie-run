@@ -19,7 +19,7 @@ export type GameRoom = {
   questions: any[]; // Used in HostPage.tsx, can be refined later
   created_at: string;
   updated_at: string;
-  chaser_type: 'zombie' | 'monster1' | 'monster2' | 'darknight'; // Ditambahkan untuk mendukung pemilihan karakter pengejar
+  chaser_type: 'zombie' | 'monster1' | 'monster2' |"monster3"| 'darknight'; // Ditambahkan untuk mendukung pemilihan karakter pengejar
 };
 
 export type Player = {

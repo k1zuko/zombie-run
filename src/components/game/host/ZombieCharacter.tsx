@@ -34,6 +34,10 @@ const chaserImages = {
     src: "/images/monster2.gif",
     alt: "Monster Rawa",
   },
+    monster3: {
+    src: "/images/monster3.gif",
+    alt: "Samurai GIla",
+  },
   darknight: {
     src: "/images/darknight.gif",
     alt: "Ksatria Gelap",
@@ -112,7 +116,7 @@ export default function ZombieCharacter({
       className="absolute z-40 origin-bottom"
       style={{
         left: `${centerX - zombieState.currentPosition + currentMovement.x}px`,
-        top: "80%",
+        top: "87%",
         transform: `translateY(${currentMovement.y}px)`,
       }}
       animate={controls}
@@ -207,7 +211,7 @@ export default function ZombieCharacter({
 
         {/* Indikator kecepatan pengejar */}
         <p
-          className={`absolute -bottom-8 left-1/2 transform -translate-x-1/2 font-mono text-sm ${
+          className={`absolute -bottom-2 left-1/2 transform -translate-x-1/2 font-mono text-sm ${
             zombieState.isAttacking ? "text-red-400 animate-pulse" : "text-gray-400"
           }`}
         >
