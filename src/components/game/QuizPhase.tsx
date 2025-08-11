@@ -153,9 +153,9 @@ export default function QuizPhase({
       const { error } = await supabase.from("game_completions").insert({
         player_id: currentPlayer.id,
         room_id: room.id,
-        final_health: finalHealth,
-        correct_answers: finalCorrect,
-        total_questions_answered: totalAnswered,
+        final_health: currentPlayer.health,
+        correct_answers: currentPlayer.correct_answers || finalCorrect,
+        total_questions_answered: currentPlayer.current_question_index + 1 || totalAnswered,
         is_eliminated: isEliminated,
         completion_type: isEliminated ? "eliminated" : finalCorrect === totalQuestions ? "completed" : "partial",
         completed_at: new Date().toISOString(),
@@ -288,57 +288,57 @@ export default function QuizPhase({
     }
   };
 
- const checkInactivityPenalty = async () => {
-  if (!room?.id || !currentPlayer?.id || playerHealth <= 0 || isProcessingAnswer) {
-    console.log("⚠️ Skipping inactivity penalty check: invalid room, player, eliminated, or processing answer");
-    setInactivityCountdown(null);
-    return;
-  }
-  try {
-    const { data, error } = await supabase
-      .from("player_health_states")
-      .select("last_answer_time, speed")
-      .eq("player_id", currentPlayer.id)
-      .eq("room_id", room.id)
-      .single();
-
-    if (error) {
-      console.error("Gagal memeriksa ketidakaktifan:", error);
+  const checkInactivityPenalty = async () => {
+    if (!room?.id || !currentPlayer?.id || playerHealth <= 0 || isProcessingAnswer) {
+      console.log("⚠️ Skipping inactivity penalty check: invalid room, player, eliminated, or processing answer");
       setInactivityCountdown(null);
       return;
     }
-
-    const lastAnswerTime = new Date(data.last_answer_time).getTime();
-    const currentTime = Date.now();
-    const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
-
-    console.log(`🕒 Pemeriksaan ketidakaktifan: timeSinceLastAnswer=${timeSinceLastAnswer}s, speed=${data.speed}`);
-
-    if (timeSinceLastAnswer >= 0 && timeSinceLastAnswer < 20 && data.speed > 20) {
-      const countdown = Math.ceil(20 - timeSinceLastAnswer);
-      console.log(`⏲️ Memulai countdown penalti: ${countdown}s`);
-      setInactivityCountdown(countdown);
-    } else if (timeSinceLastAnswer >= 20 && data.speed > 20) {
-      const newSpeed = Math.max(20, data.speed - 10);
-      console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
-      await supabase
+    try {
+      const { data, error } = await supabase
         .from("player_health_states")
-        .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
+        .select("last_answer_time, speed")
         .eq("player_id", currentPlayer.id)
-        .eq("room_id", room.id);
-      setPlayerSpeed(newSpeed);
-      setInactivityCountdown(null);
-    } else {
-      if (inactivityCountdown !== null) {
-        console.log("🔄 Menghapus countdown penalti karena pemain aktif atau kecepatan <= 20");
+        .eq("room_id", room.id)
+        .single();
+
+      if (error) {
+        console.error("Gagal memeriksa ketidakaktifan:", error);
         setInactivityCountdown(null);
+        return;
       }
+
+      const lastAnswerTime = new Date(data.last_answer_time).getTime();
+      const currentTime = Date.now();
+      const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
+
+      console.log(`🕒 Pemeriksaan ketidakaktifan: timeSinceLastAnswer=${timeSinceLastAnswer}s, speed=${data.speed}`);
+
+      if (timeSinceLastAnswer >= 0 && timeSinceLastAnswer < 20 && data.speed > 20) {
+        const countdown = Math.ceil(20 - timeSinceLastAnswer);
+        console.log(`⏲️ Memulai countdown penalti: ${countdown}s`);
+        setInactivityCountdown(countdown);
+      } else if (timeSinceLastAnswer >= 20 && data.speed > 20) {
+        const newSpeed = Math.max(20, data.speed - 10);
+        console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
+        await supabase
+          .from("player_health_states")
+          .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
+          .eq("player_id", currentPlayer.id)
+          .eq("room_id", room.id);
+        setPlayerSpeed(newSpeed);
+        setInactivityCountdown(null);
+      } else {
+        if (inactivityCountdown !== null) {
+          console.log("🔄 Menghapus countdown penalti karena pemain aktif atau kecepatan <= 20");
+          setInactivityCountdown(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error di checkInactivityPenalty:", error);
+      setInactivityCountdown(null);
     }
-  } catch (error) {
-    console.error("Error di checkInactivityPenalty:", error);
-    setInactivityCountdown(null);
-  }
-};
+  };
 
 
   const redirectToResults = async (
@@ -364,12 +364,25 @@ export default function QuizPhase({
       health: health.toString(),
       correct: correct.toString(),
       total: total.toString(),
-      nickname: encodeURIComponent(currentPlayer.nickname),
+      nickname: currentPlayer.nickname,
       ...(isEliminated && { eliminated: "true" }),
       ...(isPerfect && { perfect: "true" }),
     });
 
-    router.push(`/game/${roomCode}/results?${urlParams.toString()}`);
+    const lastResult = {
+      playerId: currentPlayer.id,
+      roomCode: roomCode,
+      nickname: currentPlayer.nickname,
+      health: health,
+      correct: correct,
+      total: total,
+      eliminated: isEliminated,
+    }
+    localStorage.setItem("lastGameResult", JSON.stringify(lastResult));
+    const Yuhu = JSON.parse(localStorage.getItem("lastGameResult") || "{}");
+    console.log("Menyimpan hasil terakhir ke localStorage LASSSSSSSSSSSS:", Yuhu);
+
+    router.push(`/game/${roomCode}/results`);
   };
 
   useEffect(() => {
@@ -535,10 +548,10 @@ export default function QuizPhase({
     <div className="min-h-screen bg-black relative overflow-hidden">
       <div
         className={`absolute inset-0 transition-all duration-1000 ${dangerLevel === 3
-            ? "bg-gradient-to-br from-red-900/40 via-black to-red-950/40"
-            : dangerLevel === 2
-              ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
-              : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
+          ? "bg-gradient-to-br from-red-900/40 via-black to-red-950/40"
+          : dangerLevel === 2
+            ? "bg-gradient-to-br from-red-950/25 via-black to-purple-950/25"
+            : "bg-gradient-to-br from-red-950/15 via-black to-purple-950/15"
           }`}
         style={{
           opacity: 0.3 + pulseIntensity * 0.4,
@@ -617,10 +630,10 @@ export default function QuizPhase({
                 <div
                   key={i}
                   className={`w-6 h-6 rounded-full border-2 transition-all duration-300 ${i < playerHealth
-                      ? playerHealth <= 1
-                        ? "bg-red-500 border-red-400 animate-pulse"
-                        : "bg-green-500 border-green-400"
-                      : "bg-gray-600 border-gray-500"
+                    ? playerHealth <= 1
+                      ? "bg-red-500 border-red-400 animate-pulse"
+                      : "bg-green-500 border-green-400"
+                    : "bg-gray-600 border-gray-500"
                     }`}
                 />
               ))}

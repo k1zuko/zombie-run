@@ -19,7 +19,7 @@ export interface TransformedPlayer {
 }
 
 export interface TransformedGameState {
-  phase: "lobby" | "quiz" | "minigame" | "finished" | "results"
+  phase: "lobby" | "quiz" | "minigame" | "finished" | "results" | "waiting" | "completed"
   currentQuestion: number
   timeRemaining: number
   currentCorrectAnswers?: number

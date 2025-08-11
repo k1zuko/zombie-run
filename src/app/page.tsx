@@ -74,8 +74,11 @@ export default function HomePage() {
       })
 
       if (playerError) throw playerError
+      
+      localStorage.setItem("nickname", nickname)
+      localStorage.setItem("roomCode", gameCode.toUpperCase())
 
-      router.push(`/game/${gameCode.toUpperCase()}?nickname=${nickname}`)
+      router.push(`/game/${gameCode.toUpperCase()}`)
     } catch (error) {
       console.error("Error joining game:", error)
       alert("Gagal bergabung ke game!")

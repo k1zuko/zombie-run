@@ -217,7 +217,7 @@ export default function SoulStatus({
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {getStatusIcon()}
-            <div>
+              <div>
                 <p className={cn(
                   "font-mono text-lg font-bold tracking-wider",
                   isDead ? "text-gray-400 line-through" : "text-red-200",

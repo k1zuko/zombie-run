@@ -48,24 +48,25 @@ function ErrorState({ onRetry, error }: { onRetry: () => void; error?: string })
 // Unknown phase component
 function UnknownPhase({ phase, room, gameState }: { phase: string; room: TransformedRoom; gameState: TransformedGameState }) {
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-black opacity-90" />
-      <div className="text-center z-10 p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-xl">
-        <p className="text-gray-300 text-lg mb-4">Unrecognized game phase: {phase}</p>
-        <div className="text-sm text-gray-400 mt-4">
-          <p>Debug Info:</p>
-          <p>Room Status: {room?.status ?? "N/A"}</p>
-          <p>Current Phase: {room?.current_phase ?? "N/A"}</p>
-          <p>Game State Phase: {gameState?.phase ?? "N/A"}</p>
-        </div>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200 transition-colors duration-200"
-        >
-          Reload Page
-        </button>
-      </div>
-    </div>
+    // <div className="min-h-screen bg-gray-900 flex items-center justify-center relative overflow-hidden">
+    //   <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-black opacity-90" />
+    //   <div className="text-center z-10 p-6 bg-gray-800 bg-opacity-80 rounded-lg shadow-xl">
+    //     <p className="text-gray-300 text-lg mb-4">Unrecognized game phase: {phase}</p>
+    //     <div className="text-sm text-gray-400 mt-4">
+    //       <p>Debug Info:</p>
+    //       <p>Room Status: {room?.status ?? "N/A"}</p>
+    //       <p>Current Phase: {room?.current_phase ?? "N/A"}</p>
+    //       <p>Game State Phase: {gameState?.phase ?? "N/A"}</p>
+    //     </div>
+    //     <button
+    //       onClick={() => window.location.reload()}
+    //       className="mt-4 px-4 py-2 bg-white text-black rounded-md hover:bg-gray-200 transition-colors duration-200"
+    //     >
+    //       Reload Page
+    //     </button>
+    //   </div>
+    // </div>
+    <LoadingScreen />
   )
 }
 
@@ -75,14 +76,13 @@ export default function GamePage() {
   const router = useRouter()
 
   const params = useParams()
-  const searchParams = useSearchParams()
   const roomCode = params.roomCode as string
-  const nickname = searchParams.get("nickname") ?? ""
+  const nickname = (typeof window !== "undefined" && localStorage.getItem("nickname")) || "Unknown"
 
-  const resumeFromMinigame = searchParams.get("resumeFromMinigame") === "true"
-  const resumeHealth = parseInt(searchParams.get("health") || "3", 10)
-  const resumeCorrect = parseInt(searchParams.get("correct") || "0", 10)
-  const resumeCurrentIndex = parseInt(searchParams.get("currentIndex") || "0", 10)
+  // const resumeFromMinigame = searchParams.get("resumeFromMinigame") === "true"
+  // const resumeHealth = parseInt(searchParams.get("health") || "3", 10)
+  // const resumeCorrect = parseInt(searchParams.get("correct") || "0", 10)
+  // const resumeCurrentIndex = parseInt(searchParams.get("currentIndex") || "0", 10)
 
   const { room, gameState, players, currentPlayer, isLoading, error, isSoloMode, refetch } = useGameData(
     roomCode,
@@ -155,23 +155,23 @@ export default function GamePage() {
   }, [currentPlayer, room, quizState])
 
   // Handle resume from minigame
-  useEffect(() => {
-    if (resumeFromMinigame && isMountedRef.current) {
-      setQuizState({
-        health: resumeHealth,
-        correctAnswers: resumeCorrect,
-        currentIndex: resumeCurrentIndex,
-        isResuming: true,
-      })
+  // useEffect(() => {
+  //   if (resumeFromMinigame && isMountedRef.current) {
+  //     setQuizState({
+  //       health: resumeHealth,
+  //       correctAnswers: resumeCorrect,
+  //       currentIndex: resumeCurrentIndex,
+  //       isResuming: true,
+  //     })
 
-      const url = new URL(window.location.href)
-      url.searchParams.delete("resumeFromMinigame")
-      url.searchParams.delete("health")
-      url.searchParams.delete("correct")
-      url.searchParams.delete("currentIndex")
-      window.history.replaceState({}, "", url.toString())
-    }
-  }, [resumeFromMinigame, resumeHealth, resumeCorrect, resumeCurrentIndex])
+  //     const url = new URL(window.location.href)
+  //     url.searchParams.delete("resumeFromMinigame")
+  //     url.searchParams.delete("health")
+  //     url.searchParams.delete("correct")
+  //     url.searchParams.delete("currentIndex")
+  //     window.history.replaceState({}, "", url.toString())
+  //   }
+  // }, [resumeFromMinigame, resumeHealth, resumeCorrect, resumeCurrentIndex])
 
   // Handle health state updates from host
   const handleHealthStateUpdate = useCallback(
@@ -312,21 +312,59 @@ export default function GamePage() {
     })
 
     if (healthState.health <= 0 && !isGameOver) {
+
       safeSetState(() => {
+        handleGameEnd()
         setIsGameOver?.(true)
         setShowCaptureAnimation?.(true)
       })
     }
   }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, setShowCaptureAnimation])
 
+  const handleGameEnd = useCallback(() => {
+    // Pastikan tidak berjalan dua kali dan semua data ada
+    if (!isMountedRef.current || !currentPlayer || !room) return;
+
+    console.log("🚀 [page.tsx] Menangani akhir permainan untuk:", currentPlayer.nickname);
+
+    // Tandai agar tidak berjalan lagi
+    isMountedRef.current = false;
+
+    // 1. Simpan ke Supabase (tidak perlu ditunggu)
+    saveGameCompletion();
+
+    // 2. Buat objek hasil untuk disimpan ke localStorage
+    const lastResult = {
+      playerId: currentPlayer.id,
+      nickname: currentPlayer.nickname,
+      health: quizState.health,
+      correct: quizState.correctAnswers,
+      total: room.questions?.length || quizState.currentIndex + 1,
+      eliminated: quizState.health <= 0,
+      roomCode: roomCode,
+    };
+
+    // 3. Simpan ke localStorage dengan kunci yang benar
+    try {
+      localStorage.setItem('lastGameResult', JSON.stringify(lastResult));
+      console.log("💾 [page.tsx] Hasil disimpan ke localStorage:", lastResult);
+    } catch (error) {
+      console.error("Gagal menyimpan hasil ke localStorage:", error);
+    }
+
+    // 4. Arahkan ke halaman hasil DENGAN URL YANG BERSIH
+    router.push(`/game/${roomCode}/results`);
+
+  }, [currentPlayer, room, quizState, saveGameCompletion, router, roomCode]);
+
+
   // Handle game completion and redirect
   useEffect(() => {
-    if (gameState?.phase === "finished" && isMountedRef.current) {
-      saveGameCompletion().then(() => {
-        router.push(`/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}`)
-      })
+    if (gameState?.phase === 'finished' || gameState?.phase === 'completed') {
+        console.log(`🏆 [page.tsx] Permainan berakhir dengan fase: ${gameState.phase}. Mengarahkan...`);
+        handleGameEnd();
     }
-  }, [gameState?.phase, roomCode, nickname, saveGameCompletion, router])
+  }, [gameState?.phase, roomCode, saveGameCompletion, router, room?.current_phase])
 
   // Cleanup on unmount
   useEffect(() => {
