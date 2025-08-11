@@ -1,3 +1,4 @@
+// src/app/game/[roomCode]/host
 
 "use client";
 
@@ -142,7 +143,7 @@ export default function HostGamePage() {
         position: index,
         lastAttackTime,
         attackIntensity: 0,
-        countdown: currentSpeed <= 30 && !isBeingAttacked && currentHealth > 0 && player.is_alive ? 5 : undefined,
+        countdown: currentSpeed <= 30 && !isBeingAttacked && currentHealth > 0 && player.is_alive ? 10 : undefined,
       };
 
       if (healthState) {
@@ -274,7 +275,7 @@ export default function HostGamePage() {
             {
               isBeingAttacked: false,
               attackIntensity: 0,
-              countdown: newSpeed <= 30 && newHealth > 0 && player.is_alive ? 5 : undefined,
+              countdown: newSpeed <= 30 && newHealth > 0 && player.is_alive ? 10 : undefined,
             }
           );
 
@@ -323,7 +324,7 @@ export default function HostGamePage() {
         {
           speed: newSpeed,
           isBeingAttacked: false,
-          countdown: newSpeed <= 30 ? 5 : undefined,
+          countdown: newSpeed <= 30 ? 10 : undefined,
         }
       );
 
@@ -385,7 +386,7 @@ export default function HostGamePage() {
         const healthState = playerHealthStates[playerId];
         if (healthState) {
           const timeSinceLastAnswer = (Date.now() - new Date(healthState.last_answer_time).getTime()) / 1000;
-          if (timeSinceLastAnswer >= 10 && state.speed > 20) {
+          if (timeSinceLastAnswer >= 20 && state.speed > 20) {
             const newSpeed = Math.max(20, state.speed - 10);
             console.log(`⚠️ Pemain ${playerId} tidak aktif, kecepatan dikurangi ke ${newSpeed}`);
             await updatePlayerState(playerId, {
@@ -398,7 +399,7 @@ export default function HostGamePage() {
         if (state.speed <= 30 && !state.isBeingAttacked && state.health > 0) {
           if (!state.countdown) {
             console.log(`⏲️ Menambahkan countdown untuk ${playerId}`);
-            updatedStates[playerId] = { ...state, countdown: 5 };
+            updatedStates[playerId] = { ...state, countdown: 10 }; // Countdown penyerangan 10 detik
           } else {
             const newCountdown = state.countdown - 1;
             console.log(`⏲️ Countdown untuk ${playerId}: ${newCountdown}s`);
@@ -411,7 +412,7 @@ export default function HostGamePage() {
                 }, { countdown: undefined });
                 handleZombieAttack(playerId, state.health - 1, state.speed);
               } else {
-                updatedStates[playerId] = { ...state, countdown: 5 };
+                updatedStates[playerId] = { ...state, countdown: 10 }; // Reset ke 10 detik jika zombie sedang menyerang
               }
             } else {
               updatedStates[playerId] = { ...state, countdown: newCountdown };
@@ -598,7 +599,7 @@ export default function HostGamePage() {
               isBeingAttacked: healthState.is_being_attacked,
               lastAttackTime: new Date(healthState.last_attack_time).getTime(),
               countdown:
-                healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 5 : undefined,
+                healthState.speed <= 30 && !healthState.is_being_attacked && healthState.health > 0 ? 10 : undefined,
             },
           }));
         }

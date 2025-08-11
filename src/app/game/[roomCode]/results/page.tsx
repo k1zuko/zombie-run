@@ -69,7 +69,12 @@ const characterGifs = [
   '/character1.gif',
   '/character2.gif',
   '/character3.gif',
-  '/character4.gif'
+  '/character4.gif',
+  '/character5.gif',
+  '/character6.gif',
+  '/character7.gif',
+  '/character8.gif',
+  '/character9.gif'
 ]
 
 export default function ResultsPage() {
@@ -92,22 +97,21 @@ export default function ResultsPage() {
     perfect: boolean
     nickname: string
   } | null>(null)
+  const [characterGif, setCharacterGif] = useState<string>("/character.gif")
 
   const isMountedRef = useRef(true)
   const channelsRef = useRef<any[]>([])
 
   const initializePlayerData = useCallback(() => {
     console.log("Search params:", Object.fromEntries(searchParams))
-    console.log("Initializing player data...");
+    console.log("Initializing player data...")
     try {
-      // Use default values if parameters are invalid
       const health = parseInt(searchParams.get("health") || "3")
       const correct = parseInt(searchParams.get("correct") || "0")
       const total = parseInt(searchParams.get("total") || "10")
       const eliminated = searchParams.get("eliminated") === "true"
       let nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown")
 
-      // Validate parameters
       if (isNaN(health) || isNaN(correct) || isNaN(total)) {
         console.warn("Invalid URL parameters: using fallback values", {
           health: searchParams.get("health"),
@@ -126,7 +130,6 @@ export default function ResultsPage() {
         return
       }
 
-      // Validate nickname
       if (!nickname || nickname === "null") {
         console.warn("Invalid nickname, using default")
         nickname = "Unknown"
@@ -155,7 +158,7 @@ export default function ResultsPage() {
         nickname: "Unknown"
       })
     }
-  }, [searchParams]) // Dependency: searchParams
+  }, [searchParams])
 
   const fetchInitialData = useCallback(async () => {
     console.log("Starting fetchInitialData for roomCode:", roomCode)
@@ -170,10 +173,8 @@ export default function ResultsPage() {
       setError(null)
       console.log("Fetching room data...")
 
-      // Initialize player data
       initializePlayerData()
 
-      // Fetch room data to get room_id
       const { data: roomData, error: roomError } = await supabase
         .from("game_rooms")
         .select("*")
@@ -190,8 +191,23 @@ export default function ResultsPage() {
       console.log("Room data fetched:", roomData)
       setRoom(roomData)
 
-      // Fetch other data concurrently
-      console.log("Fetching additional data...")
+      if (playerData?.nickname) {
+        const { data: player, error: playerError } = await supabase
+          .from("players")
+          .select("character_type")
+          .eq("room_id", roomData.id)
+          .eq("nickname", playerData.nickname)
+          .single()
+
+        if (playerError) {
+          console.warn("Error fetching player character:", playerError.message)
+        } else if (player?.character_type) {
+          const charIndex = parseInt(player.character_type.replace("robot", "")) - 1
+          setCharacterGif(`/character/character${charIndex === 0 ? "" : charIndex}.gif`)
+          console.log("Character GIF set:", `/character/character${charIndex === 0 ? "" : charIndex}.gif`)
+        }
+      }
+
       const [
         { data: completionsData, error: completionsError },
         { data: leaderboardData, error: leaderboardError },
@@ -205,7 +221,8 @@ export default function ResultsPage() {
             players!inner(nickname, character_type)
           `)
           .eq("room_id", roomData.id)
-          .order("completed_at", { ascending: false }),
+          .order("completed_at", { ascending: false })
+          .limit(10),
         supabase.rpc("get_room_leaderboard", { p_room_id: roomData.id }),
         supabase.rpc("get_room_battle_stats", { p_room_id: roomData.id }),
         supabase.rpc("get_recent_game_activity", { p_room_id: roomData.id, p_limit: 10 })
@@ -258,7 +275,7 @@ export default function ResultsPage() {
         setIsLoading(false)
       }
     }
-  }, [roomCode, initializePlayerData]) // Dependencies: roomCode, initializePlayerData
+  }, [roomCode, initializePlayerData, playerData?.nickname])
 
   const setupRealtimeSubscriptions = useCallback(() => {
     if (!room || !isMountedRef.current) return () => {}
@@ -423,7 +440,6 @@ export default function ResultsPage() {
     console.log("Triggering fetchInitialData")
     fetchInitialData()
 
-    // Timeout to prevent loading from getting stuck
     const timeout = setTimeout(() => {
       if (isMountedRef.current && isLoading) {
         console.warn("Loading timeout reached, forcing render")
@@ -433,10 +449,10 @@ export default function ResultsPage() {
           setError("Pemuatan terlalu lama, menampilkan hasil parsial dari URL")
         }
       }
-    }, 3000) // 3-second timeout
+    }, 6000)
 
     return () => clearTimeout(timeout)
-  }, [fetchInitialData]) // Removed playerData from dependencies
+  }, [fetchInitialData])
 
   useEffect(() => {
     if (room) {
@@ -473,62 +489,72 @@ export default function ResultsPage() {
   }
 
   const getPerformanceTitle = () => {
-    if (!playerData) return "JIWA YANG HILANG"
+    if (!playerData) return "PENJELAJAH YANG TERSERAP KABUT"
     const accuracy = playerData.total > 0 ? (playerData.correct / playerData.total) * 100 : 0
 
-    if (playerData.perfect) return "PENYINTAS ULUNG"
-    if (accuracy >= 90) return "PEMUSNAH MIMPI BURUK"
-    if (accuracy >= 80) return "PEMBURU KEGELAPAN"
-    if (accuracy >= 70) return "PEJUANG BERCERMIN DARAH"
-    if (accuracy >= 60) return "PEJUANG KETAKUTAN"
-    if (accuracy >= 50) return "KORBAN TERLUKAI"
-    if (accuracy >= 40) return "JIWA YANG HANCUR"
-    if (accuracy >= 30) return "BERKELIARAN DALAM SAKIT"
-    if (accuracy >= 20) return "MERINTIH MINTA AMPUN"
-    return "KORBAN YANG MENYEDIHKAN"
+    if (playerData.perfect) return "LEGEND OF THE NIGHT"
+    if (accuracy >= 90) return "Seorang Master"
+    if (accuracy >= 80) return "Penjaga Ketenangan"
+    if (accuracy >= 70) return "Jiwa Yang Bijak"
+    if (accuracy >= 60) return "Sang Pencari Ilmu"
+    if (accuracy >= 50) return "Sang Pencari Ilmu"
+    if (accuracy >= 40) return "Sang Pencari Ilmu"
+    if (accuracy >= 30) return "Sang Pencari Ilmu"
+    if (accuracy >= 20) return "Sang Pencari Ilmu"
+    return "NEW HERO OF THE DARK"
   }
 
   const getPerformanceMessage = () => {
-    if (!playerData) return "Jiwamu lenyap dalam kegelapan... tidak ada jejak yang tersisa..."
+    if (!playerData) return "Jejakmu masih tersembunyi di kabut... bangkit dan coba lagi!"
     const accuracy = playerData.total > 0 ? (playerData.correct / playerData.total) * 100 : 0
 
-    if (playerData.perfect) return "Kamu tampil sangat sempurna!!"
-    if (playerData.eliminated) return "Makhluk malam telah mengklaim dirimu... jeritanmu bergema di kehampaan..."
-    if (accuracy >= 90) return "Kamu tampil sangat hebat "
-    if (accuracy >= 70) return "Kamu cukup hebat"
-    if (accuracy >= 60) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
-    if (accuracy >= 50) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
-    if (accuracy >= 40) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
-    if (accuracy >= 30) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
-    if (accuracy >= 20) return "Semangat mu tidak akan lepas dari bayanganmu... coba lagi"
-    return "Kau hanyalah mangsa. Kegelapan menelammu tanpa usaha..."
+    if (playerData.perfect) return "Keren! Kamu menaklukkan malam dengan sempurna! Jadi legenda sejati!"
+    if (playerData.eliminated) return "Kegelapan menantangmu kali ini, tapi semangatmu masih menyala! Coba lagi, pahlawan!"
+    if (accuracy >= 90) return "Luar biasa! Kamu hampir tak terhentikan di medan horor ini!"
+    if (accuracy >= 70) return "Hebat! Kamu berjuang dengan gagah berani melawan kegelapan!"
+    if (accuracy >= 60) return "Bagus sekali! Teruslah berjuang, kamu semakin kuat!"
+    if (accuracy >= 50) return "Kamu telah melangkah jauh! Ayo, tunjukkan keberanianmu lagi!"
+    if (accuracy >= 40) return "Langkah pertamamu sudah hebat! Terus berlatih untuk jadi lebih kuat!"
+    if (accuracy >= 30) return "Kamu punya nyali! Tetap semangat, petualangan berikutnya menanti!"
+    if (accuracy >= 20) return "Keberanianmu bersinar di tengah kabut! Ayo coba lagi!"
+    return "Setiap langkah adalah awal baru! Bangkit dan hadapi horor berikutnya!"
   }
 
   const getActivityMessage = (activity: GameActivity) => {
     if (activity.activity_type === "completion") {
       const { correct_answers, final_health, is_eliminated, completion_type } = activity.activity_data
       if (is_eliminated) {
-        return `${activity.player_nickname} Mati (${correct_answers}/${playerData?.total || 10} benar)`
+        return `${activity.player_nickname} bertarung gagah berani! (${correct_answers}/${playerData?.total || 10} benar)`
       }
       if (completion_type === "completed") {
-        return `${activity.player_nickname} Telah selesai bermain! (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
+        return `${activity.player_nickname} menaklukkan petualangan! (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
       }
-      return `${activity.player_nickname} Telah selesai bermain... (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
+      return `${activity.player_nickname} menyelesaikan tantangan! (${correct_answers}/${playerData?.total || 10} benar, ${final_health} HP)`
     }
     if (activity.activity_type === "attack") {
-      const { attack_type, attack_data, damage } = activity.activity_data;
-        if (attack_type === "wrong_answer") {
-          const questionIndex = attack_data?.question_index ?? -1;
-          const questionMessage = questionIndex !== -1 ? ` pada pertanyaan ${questionIndex + 1}` : "";
-          return `${activity.player_nickname} diserang zombie karena jawaban salah${questionMessage}! (-${damage} HP)`;
-        }
-      return `${activity.player_nickname} menderita serangan ${attack_type}! (-${damage} HP)`;
+      const { attack_type, attack_data, damage } = activity.activity_data
+      if (attack_type === "wrong_answer") {
+        const questionIndex = attack_data?.question_index ?? -1
+        const questionMessage = questionIndex !== -1 ? ` pada pertanyaan ${questionIndex + 1}` : ""
+        return `${activity.player_nickname} menghadapi rintangan${questionMessage}! (-${damage} HP) Tetap semangat!`
+      }
+      return `${activity.player_nickname} menghadapi tantangan ${attack_type}! (-${damage} HP) Ayo bangkit!`
     }
-    return `${activity.player_nickname} TERKENA SERANGAN`
+    return `${activity.player_nickname} menghadapi ujian baru! Tetap kuat!`
   }
 
-  const getRandomCharacterGif = () => {
-    return characterGifs[Math.floor(Math.random() * characterGifs.length)]
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/images/tombstone.png')] bg-no-repeat bg-center bg-cover opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-red-900/10 via-black to-purple-900/10" />
+        <div className="text-center z-10">
+          <Skull className="w-16 h-16 text-red-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-white font-mono text-xl mb-4 tracking-widest">MEMANGGIL KISAH KEHEBATANMU...</p>
+          <p className="text-gray-400 font-mono text-sm">Sebentar lagi, hasil petualanganmu akan terungkap!</p>
+        </div>
+      </div>
+    )
   }
 
   if (!playerData) {
@@ -538,13 +564,13 @@ export default function ResultsPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-red-900/10 via-black to-purple-900/10" />
         <div className="text-center z-10">
           <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <p className="text-white font-mono text-xl mb-4 tracking-widest">KEHAMPAN BERJERIT DALAM SAKIT</p>
-          <p className="text-red-400 font-mono text-sm mb-6">{error || "Data permainan tidak ditemukan"}</p>
+          <p className="text-white font-mono text-xl mb-4 tracking-widest">ADA KABUT MISTERIUS...</p>
+          <p className="text-red-400 font-mono text-sm mb-6">{error || "Data petualanganmu tersesat di kegelapan, tapi jangan menyerah!"}</p>
           <Button 
             onClick={fetchInitialData} 
             className="bg-red-900 hover:bg-red-800 text-white font-mono border border-red-700"
           >
-            PANGGIL KEMBALI ROH-ROH
+            CARI KEMBALI JEJAKMU
           </Button>
         </div>
       </div>
@@ -608,11 +634,11 @@ export default function ResultsPage() {
           <div className="flex items-center justify-center mb-6">
             <Skull className="w-8 h-8 text-red-500 mr-3 animate-pulse" />
             <h1 className="text-5xl font-bold text-white font-horror tracking-wider text-red-600 drop-shadow-[0_0_8px_rgba(255,0,0,0.7)]">
-              Hasil Permainan
+             Hasil 
             </h1>
             <Skull className="w-8 h-8 text-red-500 ml-3 animate-pulse" />
           </div>
-          <p className="text-gray-400 font-mono tracking-widest text-sm">Kode ruangan: {roomCode}</p>
+          {/* <p className="text-gray-400 font-mono tracking-widest text-sm">Kode ruangan: {roomCode}</p> */}
         </motion.div>
 
         {error && (
@@ -647,7 +673,7 @@ export default function ResultsPage() {
 
                 <div className="mb-6 flex justify-center">
                   <Image 
-                    src={getRandomCharacterGif()} 
+                    src={characterGif} 
                     width={120} 
                     height={120} 
                     alt="Karakter" 
@@ -659,19 +685,19 @@ export default function ResultsPage() {
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Target className="w-6 h-6 text-green-400 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">{playerData.correct}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">BENAR</div>
+                    <div className="text-xs text-gray-400 tracking-widest">KEBERHASILAN</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Heart className="w-6 h-6 text-red-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">{playerData.health}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">NYAWA</div>
+                    <div className="text-xs text-gray-400 tracking-widest">KEKUATAN</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Trophy className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">#{getPlayerRank()}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">PERINGKAT</div>
+                    <div className="text-xs text-gray-400 tracking-widest">POSISI</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
@@ -679,71 +705,13 @@ export default function ResultsPage() {
                     <div className="text-2xl font-bold text-white font-mono">
                       {playerData.total > 0 ? Math.round((playerData.correct / playerData.total) * 100) : 0}%
                     </div>
-                    <div className="text-xs text-gray-400 tracking-widest">AKURASI</div>
+                    <div className="text-xs text-gray-400 tracking-widest">KETEPATAN</div>
                   </div>
                 </div>
-
-                {/* <div className="mb-6">
-                  <div className="flex justify-between text-xs text-gray-400 mb-2 tracking-widest">
-                    <span>HARGA DARAH DIBAYAR</span>
-                    <span>
-                      {playerData.correct}/{playerData.total}
-                    </span>
-                  </div>
-                  <Progress
-                    value={playerData.total > 0 ? (playerData.correct / playerData.total) * 100 : 0}
-                    className="h-2 bg-gray-900 border border-red-900/50"
-                  />
-                </div> */}
               </div>
             </div>
           </HorrorCard>
         </motion.div>
-
-        {/* {roomStats && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-          >
-            <HorrorCard variant="shadow" className="max-w-4xl mx-auto mb-8">
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
-                  <Skull className="w-5 h-5 mr-2 text-red-500" />
-                  INFORMASI RUANGAN
-                  <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge>
-                </h3>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-                    <div className="text-2xl font-bold text-blue-400 font-mono">{roomStats.total_players}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">JIWA YANG MASUK</div>
-                  </div>
-
-                  <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-                    <div className="text-2xl font-bold text-green-400 font-mono">{roomStats.alive_players}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">MASIH HIDUP</div>
-                  </div>
-
-                  <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-                    <div className="text-2xl font-bold text-red-400 font-mono">{roomStats.total_attacks}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">SERANGAN DILAKUKAN</div>
-                  </div>
-
-                  <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-                    <div className="text-2xl font-bold text-yellow-400 font-mono">{roomStats.recent_attacks}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">PERTUMPAHAN DARAH TERAKHIR</div>
-                  </div>
-
-                  <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-800">
-                    <div className="text-2xl font-bold text-purple-400 font-mono">{roomStats.average_health.toFixed(1)}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">RATA-RATA SISA DARAH PEMAIN</div>
-                  </div>
-                </div>
-              </div>
-            </HorrorCard>
-          </motion.div>
-        )} */}
 
         {playerStats.length > 0 && (
           <motion.div
@@ -755,8 +723,7 @@ export default function ResultsPage() {
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
-                    URUTAN PEMENANG
-                  {/* <Badge className="ml-2 bg-red-900 text-xs animate-pulse border border-red-700">LANGSUNG</Badge> */}
+                  Urutan Pemain
                 </h3>
 
                 <div className="space-y-2">
@@ -796,14 +763,14 @@ export default function ResultsPage() {
                           <div>
                             <div className="text-white font-mono tracking-wider">{player.nickname}</div>
                             <div className="text-xs text-gray-400">
-                              {player.correct_answers} benar • {player.is_alive ? "🩸 MASIH HIDUP" : "💀 TEWAS"}
+                              {player.correct_answers} benar • {player.is_alive ? "🩸 BERJUANG" : "💀 ISTIRAHAT"}
                             </div>
                           </div>
                         </div>
 
                         <div className="text-right">
                           <div className="text-lg font-bold text-white font-mono">{player.score}</div>
-                          <div className="text-xs text-gray-400 tracking-widest">POIN JIWA</div>
+                          <div className="text-xs text-gray-400 tracking-widest">POIN KEHEBATAN</div>
                         </div>
                       </motion.div>
                     ))}
@@ -824,8 +791,7 @@ export default function ResultsPage() {
               <div className="p-6">
                 <h3 className="text-xl font-bold text-white mb-4 font-horror tracking-wider flex items-center">
                   <Clock className="w-5 h-5 mr-2 text-purple-400" />
-                  INFO PEMAIN
-                  {/* <Badge className="ml-2 bg-purple-900 text-xs animate-pulse border border-purple-700">Live</Badge> */}
+                  KISAH PARA PENJELAJAH
                 </h3>
 
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
@@ -886,7 +852,7 @@ export default function ResultsPage() {
             className="bg-gray-900 hover:bg-gray-800 text-white font-mono tracking-wider flex items-center justify-center border border-gray-700"
           >
             <Home className="w-4 h-4 mr-2" />
-            KEMBALI KE AMAN
+            Halaman Utama
           </Button>
 
           <Button
@@ -896,7 +862,7 @@ export default function ResultsPage() {
             className="bg-red-900 hover:bg-red-800 text-white font-mono tracking-wider flex items-center justify-center border border-red-700"
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            HADAPI HOROR LAGI
+            Ulang Permainan
           </Button>
         </motion.div>
 
@@ -906,8 +872,8 @@ export default function ResultsPage() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 1.2 }}
         >
-          <p>MALAM TAK PERNAH BERAKHIR...</p>
-          <p className="mt-1">JERITANMU AKAN DIKENANG</p>
+          <p>PETUALANGAN MALAM SELALU MENANTI...</p>
+          <p className="mt-1">KEBERANIANMU AKAN DIKENANG!</p>
         </motion.div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+// src/components/game/QuizPhase.tsx
 
 "use client";
 
@@ -287,59 +288,60 @@ export default function QuizPhase({
     }
   };
 
-  const checkInactivityPenalty = async () => {
-    if (!room?.id || !currentPlayer?.id || playerHealth <= 0 || isProcessingAnswer) {
-      console.log("⚠️ Skipping inactivity penalty check: invalid room, player, eliminated, or processing answer");
+ const checkInactivityPenalty = async () => {
+  if (!room?.id || !currentPlayer?.id || playerHealth <= 0 || isProcessingAnswer) {
+    console.log("⚠️ Skipping inactivity penalty check: invalid room, player, eliminated, or processing answer");
+    setInactivityCountdown(null);
+    return;
+  }
+  try {
+    const { data, error } = await supabase
+      .from("player_health_states")
+      .select("last_answer_time, speed")
+      .eq("player_id", currentPlayer.id)
+      .eq("room_id", room.id)
+      .single();
+
+    if (error) {
+      console.error("Gagal memeriksa ketidakaktifan:", error);
       setInactivityCountdown(null);
       return;
     }
-    try {
-      const { data, error } = await supabase
+
+    const lastAnswerTime = new Date(data.last_answer_time).getTime();
+    const currentTime = Date.now();
+    const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
+
+    console.log(`🕒 Pemeriksaan ketidakaktifan: timeSinceLastAnswer=${timeSinceLastAnswer}s, speed=${data.speed}`);
+
+    if (timeSinceLastAnswer >= 0 && timeSinceLastAnswer < 20 && data.speed > 20) {
+      const countdown = Math.ceil(20 - timeSinceLastAnswer);
+      console.log(`⏲️ Memulai countdown penalti: ${countdown}s`);
+      setInactivityCountdown(countdown);
+    } else if (timeSinceLastAnswer >= 20 && data.speed > 20) {
+      const newSpeed = Math.max(20, data.speed - 10);
+      console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
+      await supabase
         .from("player_health_states")
-        .select("last_answer_time, speed")
+        .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
         .eq("player_id", currentPlayer.id)
-        .eq("room_id", room.id)
-        .single();
-
-      if (error) {
-        console.error("Gagal memeriksa ketidakaktifan:", error);
-        setInactivityCountdown(null);
-        return;
-      }
-
-      const lastAnswerTime = new Date(data.last_answer_time).getTime();
-      const currentTime = Date.now();
-      const timeSinceLastAnswer = (currentTime - lastAnswerTime) / 1000;
-
-      console.log(`🕒 Pemeriksaan ketidakaktifan: timeSinceLastAnswer=${timeSinceLastAnswer}s, speed=${data.speed}`);
-
-      if (timeSinceLastAnswer >= 0 && timeSinceLastAnswer < 10 && data.speed > 20) {
-        const countdown = Math.ceil(10 - timeSinceLastAnswer);
-        console.log(`⏲️ Memulai countdown penalti: ${countdown}s`);
-        setInactivityCountdown(countdown);
-      } else if (timeSinceLastAnswer >= 10 && data.speed > 20) {
-        const newSpeed = Math.max(20, data.speed - 10);
-        console.log(`⚠️ Pemain tidak aktif selama ${timeSinceLastAnswer}s, kecepatan dikurangi dari ${data.speed} ke ${newSpeed}`);
-        await supabase
-          .from("player_health_states")
-          .update({ speed: newSpeed, last_answer_time: new Date().toISOString() })
-          .eq("player_id", currentPlayer.id)
-          .eq("room_id", room.id);
-        setPlayerSpeed(newSpeed);
-        setInactivityCountdown(null);
-      } else {
-        if (inactivityCountdown !== null) {
-          console.log("🔄 Menghapus countdown penalti karena pemain aktif atau kecepatan <= 20");
-          setInactivityCountdown(null);
-        }
-      }
-    } catch (error) {
-      console.error("Error di checkInactivityPenalty:", error);
+        .eq("room_id", room.id);
+      setPlayerSpeed(newSpeed);
       setInactivityCountdown(null);
+    } else {
+      if (inactivityCountdown !== null) {
+        console.log("🔄 Menghapus countdown penalti karena pemain aktif atau kecepatan <= 20");
+        setInactivityCountdown(null);
+      }
     }
-  };
+  } catch (error) {
+    console.error("Error di checkInactivityPenalty:", error);
+    setInactivityCountdown(null);
+  }
+};
 
-  const redirectToResults = (
+
+  const redirectToResults = async (
     health: number,
     correct: number,
     total: number,
@@ -355,18 +357,19 @@ export default function QuizPhase({
       timerRef.current = null;
     }
 
-    saveGameCompletion(health, correct, total, isEliminated).then(() => {
-      const urlParams = new URLSearchParams({
-        health: health.toString(),
-        correct: correct.toString(),
-        total: total.toString(),
-        nickname: encodeURIComponent(currentPlayer.nickname),
-        ...(isEliminated && { eliminated: "true" }),
-        ...(isPerfect && { perfect: "true" }),
-      });
+    // Pastikan data disimpan ke database sebelum redirect
+    await saveGameCompletion(health, correct, total, isEliminated);
 
-      router.push(`/game/${roomCode}/results?${urlParams.toString()}`);
+    const urlParams = new URLSearchParams({
+      health: health.toString(),
+      correct: correct.toString(),
+      total: total.toString(),
+      nickname: encodeURIComponent(currentPlayer.nickname),
+      ...(isEliminated && { eliminated: "true" }),
+      ...(isPerfect && { perfect: "true" }),
     });
+
+    router.push(`/game/${roomCode}/results?${urlParams.toString()}`);
   };
 
   useEffect(() => {
