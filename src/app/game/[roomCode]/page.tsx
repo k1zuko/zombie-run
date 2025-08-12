@@ -95,7 +95,7 @@ export default function GamePage() {
     currentPlayer,
   })
 
-  const { wrongAnswers, restartGame } = gameLogic
+  const { isGameOver, setIsGameOver, wrongAnswers, restartGame, setShowCaptureAnimation } = gameLogic
 
   const [quizState, setQuizState] = useState({
     health: 3,
