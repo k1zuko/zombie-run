@@ -1,10 +1,12 @@
+
 "use client"
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Gamepad2, Users, Play, Hash, Sparkles, Zap } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Gamepad2, Users, Play, Hash, Sparkles, Zap, Settings } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { motion } from "framer-motion"
@@ -14,6 +16,8 @@ export default function HomePage() {
   const [nickname, setNickname] = useState("")
   const [isJoining, setIsJoining] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false)
+  const [quizzes, setQuizzes] = useState<any[]>([])
   const router = useRouter()
   const searchParams = useSearchParams();
 
@@ -32,7 +36,26 @@ export default function HomePage() {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
   }
 
+  const fetchQuizzes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("quizzes")
+        .select("*")
+      if (error) throw error
+      setQuizzes(data || [])
+    } catch (error) {
+      console.error("Error fetching quizzes:", error)
+    }
+  }
+
   const handleHostGame = async () => {
+    setIsCreating(true)
+    await fetchQuizzes()
+    setIsQuizDialogOpen(true)
+    setIsCreating(false)
+  }
+
+  const handleQuizSelect = async (quizId: string) => {
     setIsCreating(true)
     try {
       const roomCode = generateRoomCode()
@@ -40,19 +63,21 @@ export default function HomePage() {
         .from("game_rooms")
         .insert({
           room_code: roomCode,
-          title: "Robot Run Game",
-
+          title: "Zombie Run Game",
+          quiz_id: quizId, // Store selected quiz_id
         })
         .select()
         .single()
 
       if (error) throw error
 
-      router.push(`/host/${roomCode}`)
+      router.push(`/character-select/${roomCode}`)
     } catch (error) {
       console.error("Error creating game:", error)
+      alert("Gagal membuat game!")
     } finally {
       setIsCreating(false)
+      setIsQuizDialogOpen(false)
     }
   }
 
@@ -99,15 +124,26 @@ export default function HomePage() {
     }
   }
 
+  const handleSettingsClick = () => {
+    router.push("/questions")
+  }
+
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Background Pattern */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.1),transparent_50%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.02)_50%,transparent_75%)]" />
 
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
+      <div className="relative z-14 flex items-center justify-center min-h-screen p-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-4 left-4 text-white hover:bg-white/10"
+          onClick={handleSettingsClick}
+        >
+          <Settings className="h-6 w-6" />
+        </Button>
+
         <div className="w-full max-w-6xl">
-          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -141,19 +177,9 @@ export default function HomePage() {
             >
               Game kuis kolaboratif yang menantang
             </motion.p>
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.8, duration: 0.5 }}
-              className="flex items-center justify-center gap-2 mt-4"
-            >
-            </motion.div>
           </motion.div>
 
-          {/* Main Cards */}
           <div className="grid lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
-
-            {/* Join Game Card */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
@@ -216,6 +242,7 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             </motion.div>
+            
             {/* Host Game Card */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
@@ -261,7 +288,6 @@ export default function HomePage() {
             </motion.div>
           </div>
 
-          {/* Footer */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -271,6 +297,47 @@ export default function HomePage() {
           </motion.div>
         </div>
       </div>
+
+      <Dialog open={isQuizDialogOpen} onOpenChange={setIsQuizDialogOpen}>
+        <DialogContent className="bg-black/95 text-white border-red-500/50 max-w-4xl rounded-xl p-6 shadow-[0_0_15px_rgba(255,0,0,0.5)] max-h-[80vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader>
+            <DialogTitle className="text-3xl font-bold text-red-400 font-mono tracking-wider">
+              Pilih Kuis
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {quizzes.map((quiz) => (
+              <Card
+                key={quiz.id}
+                className="bg-black/40 border-red-500/20 hover:border-red-500 cursor-pointer"
+                onClick={() => handleQuizSelect(quiz.id)}
+              >
+                <CardHeader>
+                  <CardTitle className="text-red-400 font-mono">{quiz.theme}</CardTitle>
+                  <CardDescription className="text-red-400/80">{quiz.description || "Kuis seru untuk dimainkan!"}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-red-400 text-sm font-mono">Durasi: {quiz.duration} menit</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(26, 0, 0, 0.8);
+          border-left: 2px solid rgba(255, 0, 0, 0.3);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #8b0000, #ff0000);
+          border-radius: 4px;
+        }
+      `}</style>
     </div>
   )
 }
