@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase"
 import LoadingScreen from "@/components/game/LoadingScreen"
 import LobbyPhase from "@/components/game/LobbyPhase"
 import QuizPhase from "@/components/game/QuizPhase"
-import GameOverScreen from "@/components/game/GameOverScreen"
 import AttackOverlay from "@/components/game/AttackOverlay"
 
 // Define interfaces
@@ -96,8 +95,7 @@ export default function GamePage() {
     currentPlayer,
   })
 
-  const { isGameOver, showCaptureAnimation, wrongAnswers, restartGame, setIsGameOver, setShowCaptureAnimation } =
-    gameLogic
+  const { wrongAnswers, restartGame } = gameLogic
 
   const [quizState, setQuizState] = useState({
     health: 3,
@@ -243,7 +241,7 @@ export default function GamePage() {
         setAttackAnimation(false)
       })
       console.log("✅ Zombie attack animation completed")
-    }, 2000) // Changed from 4000 to 2000 to match 2-second animation
+    }, 2000)
   }, [safeSetState, safeSetTimeout])
 
   // Setup realtime subscription for player health states and attacks
@@ -311,13 +309,12 @@ export default function GamePage() {
       }))
     })
 
-    if (healthState.health <= 0 && !isGameOver) {
-      safeSetState(() => {
-        setIsGameOver?.(true)
-        setShowCaptureAnimation?.(true)
+    if (healthState.health <= 0) {
+      saveGameCompletion().then(() => {
+        router.push(`/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}`)
       })
     }
-  }, [playerHealthStates, currentPlayer, isGameOver, safeSetState, setIsGameOver, setShowCaptureAnimation])
+  }, [playerHealthStates, currentPlayer, saveGameCompletion, roomCode, nickname, router, safeSetState])
 
   // Handle game completion and redirect
   useEffect(() => {
@@ -343,17 +340,6 @@ export default function GamePage() {
 
   if (!room || !gameState || error) {
     return <ErrorState onRetry={refetch} error={error || "Unknown error"} />
-  }
-
-  if (isGameOver && showCaptureAnimation && currentPlayer) {
-    return (
-      <GameWrapper>
-        <div className={`${attackAnimation ? "bg-red-900/20" : ""}`}>
-          <GameOverScreen />
-        </div>
-        <AttackOverlay isVisible={attackAnimation} />
-      </GameWrapper>
-    )
   }
 
   const renderGamePhase = () => {

@@ -449,7 +449,7 @@ export default function ResultsPage() {
           setError("Pemuatan terlalu lama, menampilkan hasil parsial dari URL")
         }
       }
-    }, 6000)
+    }, 10000)
 
     return () => clearTimeout(timeout)
   }, [fetchInitialData])
@@ -501,7 +501,7 @@ export default function ResultsPage() {
     if (accuracy >= 40) return "Sang Pencari Ilmu"
     if (accuracy >= 30) return "Sang Pencari Ilmu"
     if (accuracy >= 20) return "Sang Pencari Ilmu"
-    return "NEW HERO OF THE DARK"
+    return "Siswa Haus Ilmu"
   }
 
   const getPerformanceMessage = () => {
@@ -685,19 +685,19 @@ export default function ResultsPage() {
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Target className="w-6 h-6 text-green-400 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">{playerData.correct}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">KEBERHASILAN</div>
+                    <div className="text-xs text-gray-400 tracking-widest">Benar</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Heart className="w-6 h-6 text-red-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">{playerData.health}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">KEKUATAN</div>
+                    <div className="text-xs text-gray-400 tracking-widest">Nyawa</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
                     <Trophy className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-white font-mono">#{getPlayerRank()}</div>
-                    <div className="text-xs text-gray-400 tracking-widest">POSISI</div>
+                    <div className="text-xs text-gray-400 tracking-widest">Posisi</div>
                   </div>
 
                   <div className="bg-gray-900/70 rounded-lg p-4 border border-red-900/50">
@@ -705,7 +705,7 @@ export default function ResultsPage() {
                     <div className="text-2xl font-bold text-white font-mono">
                       {playerData.total > 0 ? Math.round((playerData.correct / playerData.total) * 100) : 0}%
                     </div>
-                    <div className="text-xs text-gray-400 tracking-widest">KETEPATAN</div>
+                    <div className="text-xs text-gray-400 tracking-widest">Akurasi</div>
                   </div>
                 </div>
               </div>
