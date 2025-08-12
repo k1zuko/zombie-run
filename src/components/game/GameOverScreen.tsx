@@ -17,14 +17,8 @@ const characterGifs = [
 
 export default function GameOverScreen() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const router = useRouter()
   const roomCode = params.roomCode as string
-  const nickname = decodeURIComponent(searchParams.get("nickname") || "Unknown")
-  const health = parseInt(searchParams.get("health") || "3", 10)
-  const correct = parseInt(searchParams.get("correct") || "0", 10)
-  const total = parseInt(searchParams.get("total") || "10", 10)
-  const eliminated = searchParams.get("eliminated") === "true"
 
   const [countdown, setCountdown] = useState(7)
   const isMountedRef = useRef(true)
@@ -42,7 +36,7 @@ export default function GameOverScreen() {
         if (prev <= 1) {
           clearInterval(timer)
           router.push(
-            `/game/${roomCode}/results?nickname=${encodeURIComponent(nickname)}&health=${health}&correct=${correct}&total=${total}&eliminated=${eliminated}`
+            `/game/${roomCode}/results`
           )
           return 0
         }
@@ -51,7 +45,7 @@ export default function GameOverScreen() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [roomCode, nickname, health, correct, total, eliminated, router])
+  }, [roomCode, router])
 
   // Cleanup on unmount
   useEffect(() => {

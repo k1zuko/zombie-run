@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Play, Copy, Check, Clock, Trophy, Zap, Wifi, Skull, Bone, HeartPulse } from "lucide-react";
 import { supabase, type Player } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+import QRCode from "react-qr-code";
 
 const validChaserTypes = ["zombie", "monster1", "monster2", "monster3", "darknight"] as const;
 type ChaserType = typeof validChaserTypes[number];
@@ -44,20 +46,22 @@ export default function HostPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flickerText, setFlickerText] = useState(true);
   const [bloodDrips, setBloodDrips] = useState<Array<{ id: number; left: number; speed: number; delay: number }>>([]);
-  const [atmosphereText, setAtmosphereText] = useState("Dinding-dinding berbisik tentang dosa-dosamu...");
+  // const [atmosphereText, setAtmosphereText] = useState("Dinding-dinding berbisik tentang dosa-dosamu...");
 
-  const atmosphereTexts = [
-    "Dinding-dinding berbisik tentang dosa-dosamu...",
-    "Darah menetes dari langit-langit...",
-    "Mereka mengawasimu...",
-    "Udara berbau besi dan penyesalan...",
-    "Detak jantungmu terdengar terlalu keras...",
-    "Jangan menoleh ke belakang...",
-    "Bayangan-bayangan lapar malam ini...",
-    "Mereka hampir tiba...",
-    "Kau bisa merasakannya merayap di kulitmu?",
-    "Jiwamu sudah hilang...",
-  ];
+  const TOTAL_QUESTIONS_AVAILABLE = 50;
+
+  // const atmosphereTexts = [
+  //   "Dinding-dinding berbisik tentang dosa-dosamu...",
+  //   "Darah menetes dari langit-langit...",
+  //   "Mereka mengawasimu...",
+  //   "Udara berbau besi dan penyesalan...",
+  //   "Detak jantungmu terdengar terlalu keras...",
+  //   "Jangan menoleh ke belakang...",
+  //   "Bayangan-bayangan lapar malam ini...",
+  //   "Mereka hampir tiba...",
+  //   "Kau bisa merasakannya merayap di kulitmu?",
+  //   "Jiwamu sudah hilang...",
+  // ];
 
   const fetchRoom = useCallback(async () => {
     if (!roomCode) return;
@@ -192,13 +196,13 @@ export default function HostPage() {
       100 + Math.random() * 150,
     );
 
-    const textInterval = setInterval(() => {
-      setAtmosphereText(atmosphereTexts[Math.floor(Math.random() * atmosphereTexts.length)]);
-    }, 2500);
+    // const textInterval = setInterval(() => {
+    //   setAtmosphereText(atmosphereTexts[Math.floor(Math.random() * atmosphereTexts.length)]);
+    // }, 2500);
 
     return () => {
       clearInterval(flickerInterval);
-      clearInterval(textInterval);
+      // clearInterval(textInterval);
     };
   }, []);
 
@@ -351,12 +355,18 @@ export default function HostPage() {
     }
   };
 
-  const characterEmojis = {
-    robot1: "🤖",
-    robot2: "🦾",
-    robot3: "🚀",
-    robot4: "⚡",
-  };
+  const characterOptions = [
+    { value: "robot1", name: "Hijau", gif: "/character/character.gif", alt: "Karakter Hijau" },
+    { value: "robot2", name: "Biru", gif: "/character/character1.gif", alt: "Karakter Biru" },
+    { value: "robot3", name: "Merah", gif: "/character/character2.gif", alt: "Karakter Merah" },
+    { value: "robot4", name: "Ungu", gif: "/character/character3.gif", alt: "Karakter Ungu" },
+    { value: "robot5", name: "Oranye", gif: "/character/character4.gif", alt: "Karakter Oranye" },
+    { value: "robot6", name: "Kuning", gif: "/character/character5.gif", alt: "Karakter Kuning" },
+    { value: "robot7", name: "Abu-abu", gif: "/character/character6.gif", alt: "Karakter Abu-abu" },
+    { value: "robot8", name: "Pink", gif: "/character/character7.gif", alt: "Karakter Pink" },
+    { value: "robot9", name: "Cokelat", gif: "/character/character8.gif", alt: "Karakter Cokelat" },
+    { value: "robot10", name: "Emas", gif: "/character/character9.gif", alt: "Karakter Emas" },
+  ];
 
   if (isLoading) {
     return (
@@ -468,27 +478,35 @@ export default function HostPage() {
           transition={{ duration: 0.5 }}
           className="text-center mb-12"
         >
-          <div className="flex items-center justify-center mb-6">
+          <div className="flex items-center justify-center py-4 mb-6">
             <HeartPulse className="w-12 h-12 text-red-500 mr-4 animate-pulse" />
             <h1
-              className={`text-5xl md:text-6xl font-bold font-mono tracking-widest transition-all duration-150 ${
-                flickerText ? "text-red-500 opacity-100" : "text-red-900 opacity-30"
-              } drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]`}
+              className={`text-5xl md:text-6xl font-bold font-mono tracking-widest transition-all duration-150 ${flickerText ? "text-red-500 opacity-100" : "text-red-900 opacity-30"
+                } drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]`}
               style={{ textShadow: "0 0 10px rgba(239, 68, 68, 0.7)" }}
             >
               ZOMBIE RUN
             </h1>
             <HeartPulse className="w-12 h-12 text-red-500 ml-4 animate-pulse" />
           </div>
-          <p className="text-red-400/80 text-lg md:text-xl font-mono animate-pulse tracking-wider mb-6">
+          {/* <p className="text-red-400/80 text-lg md:text-xl font-mono animate-pulse tracking-wider mb-6">
             {atmosphereText}
-          </p>
+          </p> */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.3 }}
             className="inline-flex items-center gap-4 bg-black/40 border border-red-900/50 rounded-lg p-4 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
           >
+            <motion.div
+              className="w-16 h-16 md:w-24 md:h-24 border border-red-900/50 rounded-lg overflow-hidden p-2">
+              <QRCode
+                value={`${window.location.origin}/${roomCode}`}
+                size={256}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 256 256`}
+              />
+            </motion.div>
             <div className="text-center">
               <div className="text-red-400 text-sm font-mono">Kode Game</div>
               <div className="text-2xl md:text-3xl font-mono font-bold text-red-500 tracking-wider">{roomCode}</div>
@@ -510,20 +528,19 @@ export default function HostPage() {
             </Button>
             <div className="flex items-center gap-2">
               <Wifi
-                className={`w-4 h-4 ${
-                  connectionStatus === "connected"
-                    ? "text-red-400"
-                    : connectionStatus === "connecting"
+                className={`w-4 h-4 ${connectionStatus === "connected"
+                  ? "text-red-400"
+                  : connectionStatus === "connecting"
                     ? "text-yellow-400"
                     : "text-red-900"
-                }`}
+                  }`}
               />
               <span className="text-xs text-red-400 font-mono">
                 {connectionStatus === "connected"
                   ? "Tersambung"
                   : connectionStatus === "connecting"
-                  ? "Menghubungkan..."
-                  : "Terputus"}
+                    ? "Menghubungkan..."
+                    : "Terputus"}
               </span>
             </div>
           </motion.div>
@@ -533,10 +550,10 @@ export default function HostPage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12"
+          className="grid grid-cols-3 md:grid-cols-3 gap-4 md:gap-6 mb-8"
         >
           <Card className="bg-black/40 border border-red-900/50 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-            <CardContent className="p-4 md:p-6 text-center">
+            <CardContent className="p-2 text-center">
               <Users className="w-6 h-6 md:w-8 md:h-8 text-red-500 mx-auto mb-2" />
               <motion.div
                 key={players.length}
@@ -550,7 +567,7 @@ export default function HostPage() {
             </CardContent>
           </Card>
           <Card className="bg-black/40 border border-red-900/50 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-            <CardContent className="p-4 md:p-6 text-center">
+            <CardContent className="p-2 text-center">
               <Clock className="w-6 h-6 md:w-8 md:h-8 text-red-500 mx-auto mb-2" />
               <div className="text-2xl md:text-3xl font-bold text-red-500 mb-1 font-mono">
                 {Math.floor((room.duration || 600) / 60)}:{((room.duration || 600) % 60).toString().padStart(2, "0")}
@@ -559,13 +576,13 @@ export default function HostPage() {
             </CardContent>
           </Card>
           <Card className="bg-black/40 border border-red-900/50 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-            <CardContent className="p-4 md:p-6 text-center">
+            <CardContent className="p-2 text-center">
               <Trophy className="w-6 h-6 md:w-8 md:h-8 text-red-500 mx-auto mb-2" />
               <div className="text-2xl md:text-3xl font-bold text-red-500 mb-1 font-mono">{room.question_count || 20}</div>
               <div className="text-red-400 text-sm font-mono">Soal</div>
             </CardContent>
           </Card>
-          <Card className="bg-black/40 border border-red-900/50 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+          {/* <Card className="bg-black/40 border border-red-900/50 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]">
             <CardContent className="p-4 md:p-6 text-center">
               <Zap className="w-6 h-6 md:w-8 md:h-8 text-red-500 mx-auto mb-2" />
               <div className="text-2xl md:text-3xl font-bold text-red-500 mb-1 font-mono">
@@ -573,7 +590,7 @@ export default function HostPage() {
               </div>
               <div className="text-red-400 text-sm font-mono">Status</div>
             </CardContent>
-          </Card>
+          </Card> */}
         </motion.div>
 
         <motion.div
@@ -586,7 +603,7 @@ export default function HostPage() {
             <CardHeader>
               <CardTitle className="text-red-500 text-xl md:text-2xl font-mono flex items-center gap-3">
                 <Users className="w-5 h-5 md:w-6 md:h-6" />
-                Pemain yang Bergabung
+                Pemain
                 <Badge variant="secondary" className="bg-red-900/50 text-red-400 font-mono">
                   {players.length} online
                 </Badge>
@@ -632,46 +649,62 @@ export default function HostPage() {
                     layout
                   >
                     <AnimatePresence>
-                      {players.map((player, index) => (
-                        <motion.div
-                          key={player.id}
-                          layout
-                          initial={{ opacity: 0, scale: 0, y: 20 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0, y: -20 }}
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30,
-                            delay: index * 0.05,
-                          }}
-                          whileHover={{ scale: 1.05 }}
-                          className="bg-black/40 border border-red-900/50 rounded-lg p-4 text-center hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
-                        >
+                      {players.map((player, index) => {
+                        const selectedCharacter = characterOptions.find(
+                          (char) => char.value === player.character_type
+                        );
+
+                        return (
                           <motion.div
-                            className="text-2xl md:text-3xl mb-2"
-                            animate={{
-                              rotate: [0, 10, -10, 0],
-                            }}
+                            key={player.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0, y: -20 }}
                             transition={{
-                              duration: 2,
-                              repeat: Number.POSITIVE_INFINITY,
-                              delay: index * 0.2,
+                              type: "spring",
+                              stiffness: 500,
+                              damping: 30,
+                              delay: index * 0.05,
                             }}
+                            whileHover={{ scale: 1.05 }}
+                            className="bg-black/40 border border-red-900/50 rounded-lg p-4 text-center hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
                           >
-                            {characterEmojis[player.character_type as keyof typeof characterEmojis] || "🤖"}
+                            {/* --- GANTI DENGAN TAG IMG DAN AMBIL GIFNYA --- */}
+                            <motion.div
+                              className="text-2xl md:text-3xl mb-2"
+                              animate={{
+                                rotate: [0, 10, -10, 0],
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Number.POSITIVE_INFINITY,
+                                delay: index * 0.2,
+                              }}
+                            >
+                              {/* Tampilkan GIF jika karakter ditemukan, jika tidak, tampilkan teks default */}
+                              {selectedCharacter ? (
+                                <img
+                                  src={selectedCharacter.gif}
+                                  alt={selectedCharacter.alt}
+                                  className="w-15 mx-auto" // Sesuaikan ukuran sesuai kebutuhan
+                                />
+                              ) : (
+                                player.character_type // Tampilkan teks robot jika GIF tidak ditemukan
+                              )}
+                            </motion.div>
+                            <div className="text-red-500 font-medium text-sm truncate mb-1 font-mono">{player.nickname}</div>
+                            {player.is_host && (
+                              <Badge variant="secondary" className="text-xs bg-red-900 text-red-400 font-mono">
+                                Tuan Rumah
+                              </Badge>
+                            )}
+                            <div className="text-red-400/80 text-xs mt-1 font-mono">
+                              {new Date(player.joined_at).toLocaleTimeString()}
+                            </div>
                           </motion.div>
-                          <div className="text-red-500 font-medium text-sm truncate mb-1 font-mono">{player.nickname}</div>
-                          {player.is_host && (
-                            <Badge variant="secondary" className="text-xs bg-red-900 text-red-400 font-mono">
-                              Tuan Rumah
-                            </Badge>
-                          )}
-                          <div className="text-red-400/80 text-xs mt-1 font-mono">
-                            {new Date(player.joined_at).toLocaleTimeString()}
-                          </div>
-                        </motion.div>
-                      ))}
+                        );
+                      })}
                     </AnimatePresence>
                   </motion.div>
                 )}

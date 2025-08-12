@@ -1,13 +1,13 @@
 
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Gamepad2, Users, Play, Hash, Sparkles, Zap, Settings } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { motion } from "framer-motion"
 
@@ -19,6 +19,18 @@ export default function HomePage() {
   const [isQuizDialogOpen, setIsQuizDialogOpen] = useState(false)
   const [quizzes, setQuizzes] = useState<any[]>([])
   const router = useRouter()
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code');
+
+    if (codeFromUrl) {
+      console.log(`Menemukan kode ruangan dari URL: ${codeFromUrl}`);
+      setGameCode(codeFromUrl.toUpperCase());
+      window.history.replaceState(null, '', '/');
+    }
+  }, [searchParams]);
+
 
   const generateRoomCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -100,7 +112,10 @@ export default function HomePage() {
 
       if (playerError) throw playerError
 
-      router.push(`/game/${gameCode.toUpperCase()}?nickname=${nickname}`)
+      localStorage.setItem("nickname", nickname)
+      localStorage.setItem("roomCode", gameCode.toUpperCase())
+
+      router.push(`/game/${gameCode.toUpperCase()}`)
     } catch (error) {
       console.error("Error joining game:", error)
       alert("Gagal bergabung ke game!")
@@ -227,6 +242,8 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             </motion.div>
+            
+            {/* Host Game Card */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}

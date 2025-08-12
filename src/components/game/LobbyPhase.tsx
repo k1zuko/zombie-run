@@ -433,7 +433,7 @@ export default function LobbyPhase({
             {sortedPlayers.map((player) => (
               <div
                 key={player.id}
-                className="relative bg-black/40 border border-red-900/50 rounded-lg p-4 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                className="relative bg-black/40 border border-red-900/50 rounded-lg p-4 lg:mx-2 md:mx-5 mx-10 m-2 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
               >
                 <div className="absolute -top-2 -left-2 text-red-500">
                   <Ghost className="w-5 h-5" />
