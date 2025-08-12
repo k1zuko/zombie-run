@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Gamepad2, Users, Play, Hash, Sparkles, Zap } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { motion } from "framer-motion"
 
@@ -15,6 +15,18 @@ export default function HomePage() {
   const [isJoining, setIsJoining] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('code');
+
+    if (codeFromUrl) {
+      console.log(`Menemukan kode ruangan dari URL: ${codeFromUrl}`);
+      setGameCode(codeFromUrl.toUpperCase());
+      window.history.replaceState(null, '', '/');
+    }
+  }, [searchParams]);
+
 
   const generateRoomCode = () => {
     return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -74,7 +86,7 @@ export default function HomePage() {
       })
 
       if (playerError) throw playerError
-      
+
       localStorage.setItem("nickname", nickname)
       localStorage.setItem("roomCode", gameCode.toUpperCase())
 
@@ -204,49 +216,49 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             </motion.div>
-          {/* Host Game Card */}
-          <motion.div
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-            whileHover={{ scale: 1.02 }}
-            className="group"
-          >
-            <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 h-full">
-              <CardHeader className="text-center pb-6">
-                <motion.div
-                  className="w-20 h-20 bg-gradient-to-br from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:shadow-2xl group-hover:shadow-white/20 transition-all duration-300"
-                  whileHover={{ rotate: 5 }}
-                >
-                  <Users className="w-10 h-10 text-black" />
-                </motion.div>
-                <CardTitle className="text-3xl font-bold text-white mb-2">Host Game</CardTitle>
-                <CardDescription className="text-gray-400 text-lg">
-                  Buat room baru dan undang teman-teman untuk bermain bersama
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <Button
-                  onClick={handleHostGame}
-                  disabled={isCreating}
-                  className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50 cursor-pointer"
-                >
-                  {isCreating ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                      className="w-5 h-5 mr-2"
-                    >
-                      <Zap className="w-5 h-5" />
-                    </motion.div>
-                  ) : (
-                    <Play className="w-5 h-5 mr-2" />
-                  )}
-                  {isCreating ? "Membuat Game..." : "Buat Game Baru"}
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.div>
+            {/* Host Game Card */}
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3, duration: 0.8 }}
+              whileHover={{ scale: 1.02 }}
+              className="group"
+            >
+              <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 h-full">
+                <CardHeader className="text-center pb-6">
+                  <motion.div
+                    className="w-20 h-20 bg-gradient-to-br from-white to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:shadow-2xl group-hover:shadow-white/20 transition-all duration-300"
+                    whileHover={{ rotate: 5 }}
+                  >
+                    <Users className="w-10 h-10 text-black" />
+                  </motion.div>
+                  <CardTitle className="text-3xl font-bold text-white mb-2">Host Game</CardTitle>
+                  <CardDescription className="text-gray-400 text-lg">
+                    Buat room baru dan undang teman-teman untuk bermain bersama
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <Button
+                    onClick={handleHostGame}
+                    disabled={isCreating}
+                    className="w-full bg-white text-black hover:bg-gray-200 font-bold py-4 text-lg rounded-xl transition-all duration-300 group-hover:shadow-lg disabled:opacity-50 cursor-pointer"
+                  >
+                    {isCreating ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                        className="w-5 h-5 mr-2"
+                      >
+                        <Zap className="w-5 h-5" />
+                      </motion.div>
+                    ) : (
+                      <Play className="w-5 h-5 mr-2" />
+                    )}
+                    {isCreating ? "Membuat Game..." : "Buat Game Baru"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
 
           {/* Footer */}

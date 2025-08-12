@@ -676,7 +676,7 @@ export default function QuizPhase({
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                     <div className="flex items-center space-x-3 relative z-10">
-                      <span className="w-8 h-8 rounded-full border-2 border-current flex-items-center justify-center text-sm font-bold">
+                      <span className="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center text-sm font-bold">
                         {String.fromCharCode(65 + index)}
                       </span>
                       <span>{option}</span>

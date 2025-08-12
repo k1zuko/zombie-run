@@ -12,6 +12,7 @@ import { Users, Play, Settings, Copy, Check, Clock, Trophy, Zap, Wifi, Skull, Bo
 import { supabase, type Player } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import QRCode from "react-qr-code";
 
 // Validasi tipe chaser
 const validChaserTypes = ["zombie", "monster1", "monster2", "monster3", "darknight"] as const;
@@ -629,6 +630,15 @@ export default function HostPage() {
             transition={{ delay: 0.3 }}
             className="inline-flex items-center gap-4 bg-black/40 border border-red-900/50 rounded-lg p-4 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
           >
+            <motion.div
+              className="w-16 h-16 md:w-24 md:h-24 border border-red-900/50 rounded-lg overflow-hidden p-2">
+              <QRCode
+                value={`${window.location.origin}/${roomCode}`}
+                size={256}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 256 256`}
+              />
+            </motion.div>
             <div className="text-center">
               <div className="text-red-400 text-sm font-mono">Kode Game</div>
               <div className="text-2xl md:text-3xl font-mono font-bold text-red-500 tracking-wider">{roomCode}</div>
@@ -651,10 +661,10 @@ export default function HostPage() {
             <div className="flex items-center gap-2">
               <Wifi
                 className={`w-4 h-4 ${connectionStatus === "connected"
-                    ? "text-red-400"
-                    : connectionStatus === "connecting"
-                      ? "text-yellow-400"
-                      : "text-red-900"
+                  ? "text-red-400"
+                  : connectionStatus === "connecting"
+                    ? "text-yellow-400"
+                    : "text-red-900"
                   }`}
               />
               <span className="text-xs text-red-400 font-mono">
