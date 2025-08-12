@@ -238,7 +238,9 @@ export default function HostPage() {
   }, [room?.countdown_start]);
 
   const copyRoomCode = async () => {
-    await navigator.clipboard.writeText(roomCode);
+    if (typeof window === "undefined") return;
+    const joinLink = `${window.location.origin}/?code=${roomCode}`;
+    await navigator.clipboard.writeText(joinLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -499,9 +501,9 @@ export default function HostPage() {
             className="inline-flex items-center gap-4 bg-black/40 border border-red-900/50 rounded-lg p-4 hover:border-red-500 transition-all duration-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
           >
             <motion.div
-              className="w-16 h-16 md:w-24 md:h-24 border border-red-900/50 rounded-lg overflow-hidden p-2">
+              className="w-16 h-16 md:w-24 md:h-24 border bg-white border-red-900/50 rounded overflow-hidden p-1">
               <QRCode
-                value={`${window.location.origin}/${roomCode}`}
+                value={`${window.location.origin}/?code=${roomCode}`}
                 size={256}
                 style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                 viewBox={`0 0 256 256`}
@@ -535,13 +537,6 @@ export default function HostPage() {
                     : "text-red-900"
                   }`}
               />
-              <span className="text-xs text-red-400 font-mono">
-                {connectionStatus === "connected"
-                  ? "Tersambung"
-                  : connectionStatus === "connecting"
-                    ? "Menghubungkan..."
-                    : "Terputus"}
-              </span>
             </div>
           </motion.div>
         </motion.div>
